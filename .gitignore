@@ -1,0 +1,15 @@
+.venv/
+.uv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+.DS_Store
+.env
+outputs/
+cache/
+checkpoints/
+.marimo/
+data/
+artifacts/
