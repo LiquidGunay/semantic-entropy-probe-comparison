@@ -17,6 +17,8 @@ checkpoints/
 .marimo.log
 artifacts/
 artifacts_clean/
+!artifacts_clean/analysis/analysis.parquet
+!artifacts_clean/models/probe_eval.json
 data/math_raw.jsonl
 data/math_runs.jsonl
 data/math_semantic_entropy.jsonl

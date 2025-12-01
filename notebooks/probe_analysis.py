@@ -11,9 +11,10 @@ def _():
     import numpy as np
     import pandas as pd
     import json
+    import os
     from pathlib import Path
     from sklearn.metrics import roc_curve
-    return Path, alt, json, mo, pd, roc_curve
+    return Path, alt, json, mo, os, pd, roc_curve
 
 
 @app.cell
@@ -26,10 +27,15 @@ def _(mo):
 
 
 @app.cell
-def _(Path, json, mo, pd):
-    data_path = Path("artifacts_clean/analysis/analysis.parquet")
-    metrics_path = Path("artifacts_clean/models/probe_eval.json")
-    df_all = pd.read_parquet(data_path)
+def _(Path, json, mo, os, pd):
+    data_path = Path(os.getenv("ANALYSIS_PARQUET", "artifacts_clean/analysis/analysis.parquet"))
+    metrics_path = Path(os.getenv("METRICS_JSON", "artifacts_clean/models/probe_eval.json"))
+    if data_path.exists():
+        df_all = pd.read_parquet(data_path)
+        data_notice = mo.md(f"Loaded analysis dataset: `{data_path}`")
+    else:
+        df_all = pd.DataFrame()
+        data_notice = mo.alert(f"Analysis dataset not found: {data_path}. Set ANALYSIS_PARQUET or include the parquet in the image.")
 
     topic_map = {}
     level_map = {}
@@ -51,16 +57,19 @@ def _(Path, json, mo, pd):
         seed_box=mo.ui.number(start=0, stop=10_000, step=1, value=42, label="Random seed"),
         metrics_path=metrics_path,
     )
-    mo.hstack(
-        [
-            controls["dataset_filter"],
-            controls["rep_only"],
-            controls["correctness_filter"],
-            controls["max_points"],
-            controls["seed_box"],
-        ]
-    )
-    return controls, df_all
+    mo.vstack([
+        data_notice,
+        mo.hstack(
+            [
+                controls["dataset_filter"],
+                controls["rep_only"],
+                controls["correctness_filter"],
+                controls["max_points"],
+                controls["seed_box"],
+            ]
+        )
+    ])
+    return controls, df_all, metrics_path
 
 
 @app.cell

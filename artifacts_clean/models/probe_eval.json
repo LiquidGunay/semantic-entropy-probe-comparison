@@ -1,0 +1,16 @@
+{
+  "math_test": {
+    "auc_accuracy_probe": 0.8846344571892018,
+    "auprc_accuracy_probe": 0.926260047270696,
+    "p_value_auc_accuracy": 0.001996007984031936,
+    "auc_se_probe": 0.6591449426485922,
+    "auprc_se_probe": 0.7391336317352469,
+    "p_value_auc_se": 0.001996007984031936,
+    "auc_entropy_baseline": 0.7060085737458,
+    "auprc_entropy_baseline": 0.7994076515682642,
+    "p_value_auc_entropy": 0.001996007984031936,
+    "mean_conf_acc_correct": 0.8728001751406604,
+    "mean_conf_acc_incorrect": 0.26231203269138786,
+    "tau_answer": 0.0
+  }
+}
