@@ -1,4 +1,13 @@
-# Semantic Entropy Probes (marimo + nnsight)
+# Semantic Entropy Probes (Qwen + uncertainty signals)
+
+This repo runs and inspects uncertainty signals on math/OOD questions:
+- Multi-sample generations from Qwen models (vLLM preferred; HF fallback).
+- Semantic entropy labels (NLI or cosine).
+- Hidden-state tracing at </think> and three probes (accuracy, SE, entropy baseline).
+- Evaluation (AUROC/AUPRC, p-values) and an interactive marimo notebook for exploration.
+- Data and artifacts are LFS-tracked (`data/`, `artifacts/`) so you can pull a full run via `git lfs pull` without regenerating.
+
+## Install
 
 Quickstart (from repo root):
 
@@ -27,7 +36,19 @@ Notes
 - Global Hugging Face cache is used (no local data directory).
 - GPU memory budget ~4–6GB → keep batch sizes small; NLI on CPU to save VRAM.
 
-## Qwen Uncertainty Pipeline (MATH-500 style)
+## What’s inside
+- `scripts/01_generate_with_vllm.py`: sample K runs per question (vLLM or HF fallback).
+- `scripts/02_compute_semantic_entropy.py`: compute semantic entropy per math question.
+- `scripts/03_trace_with_nnsight.py`: capture hidden states at </think>.
+- `scripts/04_build_probe_datasets.py`: join runs + hidden + labels into NPZ splits.
+- `scripts/05_train_probes.py`: train accuracy, SE (high semantic entropy), and entropy baseline probes.
+- `scripts/06_eval_probes.py`: AUROC/AUPRC + permutation p-values, confidence summary.
+- `scripts/07_build_analysis_dataset.py`: compact per-run parquet with probe scores, entropies, UMAP coords for the notebook.
+- `notebooks/probe_analysis.py`: Altair + marimo dashboard (filters, margin/entropy scatter, fixed UMAP, capped selection details).
+- `artifacts/`: hidden states, probe datasets, models, eval JSON, analysis parquet (LFS).
+- `data/`: math_raw/runs/semantic entropy (LFS); add `ood_raw.jsonl` if needed.
+
+## Qwen uncertainty pipeline (MATH-500 style)
 
 For larger runs on Qwen3-4B (or local smoke tests with Qwen3-0.6B):
 
@@ -76,6 +97,10 @@ Outputs land in `data/` (runs, semantic entropy) and `artifacts/` (hidden states
 python scripts/07_build_analysis_dataset.py  # reads artifacts, writes artifacts/analysis/analysis.parquet
 uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 7860
 ```
+
+## LFS and pulling data
+- `data/**` and `artifacts/**` are tracked via Git LFS. After cloning, run `git lfs install --local` and `git lfs pull` to fetch the full run outputs (no regeneration needed).
+- Caches (`.hf-cache/`, `.uv-cache/`) stay untracked.
 
 ### Current smoke test (HF fallback, GTX 1660 Ti)
 - Synthetic 10 easy math questions, 10 runs each with `--backend hf --model Qwen/Qwen2-0.5B-Instruct --dtype float16 --max-new-tokens 32`.
