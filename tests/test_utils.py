@@ -42,6 +42,17 @@ def test_extract_answer_text_nested_after_think():
     assert U.extract_answer_text(text) == "a + \\boxed{b} + c"
 
 
+def test_extract_full_and_final_answer():
+    text = "prefix </think> tail here \\boxed{42} and more"
+    full = U.extract_full_answer(text)
+    assert full.startswith("tail here")
+    assert U.extract_final_answer(full) == "42"
+
+
+def test_dfrac_equivalence():
+    assert U.answers_equivalent("\\dfrac{9}{256}", "\\frac{9}{256}")
+
+
 def test_find_subsequence():
     seq = [1, 2, 3, 2, 3, 4]
     assert U.find_subsequence(seq, [2, 3]) == 1

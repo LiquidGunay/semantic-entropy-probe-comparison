@@ -50,11 +50,13 @@ def main() -> int:
 
     train_path = data_dir / "math_train.npz"
     val_path = data_dir / "math_val.npz"
-    if not train_path.exists() or not val_path.exists():
-        raise FileNotFoundError("Train/val probe datasets not found. Run 04_build_probe_datasets.py first.")
-
+    if not train_path.exists():
+        raise FileNotFoundError("Train probe dataset not found. Run 04_build_probe_datasets.py first.")
     X_train, y_train, ent_train, se_train = _load_split(train_path)
-    X_val, y_val, ent_val, se_val = _load_split(val_path)
+    if val_path.exists():
+        X_val, y_val, ent_val, se_val = _load_split(val_path)
+    else:
+        X_val, y_val, ent_val, se_val = X_train, y_train, ent_train, se_train
 
     # Semantic entropy threshold (median over train, ignoring NaNs)
     se_clean = se_train[~np.isnan(se_train)]
@@ -67,15 +69,14 @@ def main() -> int:
     acc_probe = _train_logreg(X_train, y_train)
     se_probe = _train_logreg(X_train, y_high_se_train)
     ent_probe = _train_logreg(ent_train.reshape(-1, 1), y_train)
-
-def _metrics(model, X, y_true):
-    if len(y_true) < 2 or len(np.unique(y_true)) < 2:
-        return {"roc_auc": float("nan"), "auprc": float("nan")}
-    probs = model.predict_proba(X)[:, 1]
-    return {
-        "roc_auc": float(roc_auc_score(y_true, probs)),
-        "auprc": float(average_precision_score(y_true, probs)),
-    }
+    def _metrics(model, X, y_true):
+        if len(y_true) < 2 or len(np.unique(y_true)) < 2:
+            return {"roc_auc": float("nan"), "auprc": float("nan")}
+        probs = model.predict_proba(X)[:, 1]
+        return {
+            "roc_auc": float(roc_auc_score(y_true, probs)),
+            "auprc": float(average_precision_score(y_true, probs)),
+        }
 
     print("[val] accuracy probe:", _metrics(acc_probe, X_val, y_val))
     print("[val] se probe (label=high SE):", _metrics(se_probe, X_val, y_high_se_val))

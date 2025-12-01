@@ -98,6 +98,19 @@ python scripts/07_build_analysis_dataset.py  # reads artifacts, writes artifacts
 uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 7860
 ```
 
+### Deploy & embed (Railway)
+- Deployment command is provided in `Procfile`:\
+  `uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port $PORT --no-token --allow-origins="*"`
+- The app is read-only (`marimo run`) and CORS-open for iframe embedding. See `Railway.md` for setup steps.
+- Example iframe snippet:
+```html
+<iframe
+  src="https://YOUR_APP_URL"
+  style="width:100%;height:900px;border:0;"
+  allow="clipboard-read; clipboard-write">
+</iframe>
+```
+
 ## LFS and pulling data
 - `data/**` and `artifacts/**` are tracked via Git LFS. After cloning, run `git lfs install --local` and `git lfs pull` to fetch the full run outputs (no regeneration needed).
 - Caches (`.hf-cache/`, `.uv-cache/`) stay untracked.

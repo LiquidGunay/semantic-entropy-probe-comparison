@@ -1,238 +1,316 @@
 import marimo
 
-__generated_with = "0.7.13"
+__generated_with = "0.18.1"
 app = marimo.App(width="wide")
 
 
 @app.cell
-def __():
+def _():
     import marimo as mo
     import altair as alt
     import numpy as np
     import pandas as pd
-    from pathlib import Path
     import json
-
-    return alt, json, mo, np, pd, Path
-
-
-@app.cell
-def __(mo):
-    mo.md(
-        """
-        # Probe Analysis (Altair + marimo)
-
-        This notebook visualizes per-run probe outputs, entropies, and UMAP embeddings.
-        Use the filters to slice the dataset, then select up to 10 runs for details.
-        """
-    )
+    from pathlib import Path
+    from sklearn.metrics import roc_curve
+    return Path, alt, json, mo, pd, roc_curve
 
 
 @app.cell
-def __(mo, Path):
-    default_data = Path("artifacts/analysis/analysis.parquet")
-    default_metrics = Path("artifacts/models/probe_eval.json")
-    data_path = mo.ui.text(str(default_data), label="Analysis dataset (.parquet)")
-    metrics_path = mo.ui.text(str(default_metrics), label="Probe metrics JSON")
-    dataset_filter = mo.ui.dropdown(
-        options=["all", "math", "ood"], value="all", label="Dataset"
-    )
-    rep_only = mo.ui.switch(value=False, label="Per-question representative only")
-    correctness_filter = mo.ui.dropdown(
-        options=["all", "correct", "incorrect"], value="all", label="Correctness"
-    )
-    max_points = mo.ui.slider(200, 10000, value=5000, step=200, label="Max points to plot")
-    seed_box = mo.ui.number(value=42, label="Random seed", min=0, max=10_000, step=1)
-    return correctness_filter, data_path, dataset_filter, max_points, metrics_path, rep_only, seed_box
+def _(mo):
+    mo.md("""
+    # Probe Analysis (Altair + marimo)
+    Visualize probe scores, entropies, and UMAP embeddings. Use the controls to filter; charts support interval selection.
+    """)
+    return
 
 
 @app.cell
-def __(json, mo, np, pd, Path, correctness_filter, data_path, dataset_filter, max_points, rep_only, seed_box):
-    path = Path(data_path.value)
-    df = None
-    load_error = None
-    if path.exists():
-        try:
-            df = pd.read_parquet(path)
-        except Exception as e:
-            load_error = str(e)
-    else:
-        load_error = f"Missing file: {path}"
+def _(Path, json, mo, pd):
+    data_path = Path("artifacts_clean/analysis/analysis.parquet")
+    metrics_path = Path("artifacts_clean/models/probe_eval.json")
+    df_all = pd.read_parquet(data_path)
 
-    if df is None:
-        mo.alert(load_error or "Failed to load dataset.")
-        filtered = pd.DataFrame()
-        selection = mo.ui.multiselect(options=[], value=[], label="Select runs (<=10)")
-        return df, filtered, selection
+    topic_map = {}
+    level_map = {}
+    math_raw = Path("data/math_raw.jsonl")
+    if math_raw.exists():
+        records = [json.loads(line) for line in math_raw.open()]
+        topic_map = {str(rec.get("id")): rec.get("topic", "") for rec in records}
+        level_map = {str(rec.get("id")): rec.get("level", "") for rec in records}
+    df_all["problem_type"] = df_all["question_id"].astype(str).map(topic_map).fillna("")
+    df_all["difficulty"] = df_all["question_id"].astype(str).map(level_map).fillna("")
+    df_all["reason_tokens"] = df_all.get("think_token_len", 0)
+    df_all["reason_chars"] = df_all.get("think_char_len", 0)
 
-    df["is_correct"] = df["is_correct"].astype(bool)
-    df["probe_margin"] = df["probe_margin"].astype(float)
-    df["mean_think_entropy"] = df["mean_think_entropy"].astype(float)
-    if "semantic_entropy" not in df.columns:
-        df["semantic_entropy"] = np.nan
-    df["semantic_entropy"] = df["semantic_entropy"].astype(float)
-
-    filtered = df.copy()
-    if dataset_filter.value != "all":
-        filtered = filtered[filtered["dataset"] == dataset_filter.value]
-    if rep_only.value:
-        filtered = filtered[filtered.get("is_representative", False)]
-    if correctness_filter.value == "correct":
-        filtered = filtered[filtered["is_correct"]]
-    elif correctness_filter.value == "incorrect":
-        filtered = filtered[~filtered["is_correct"]]
-
-    if len(filtered) > max_points.value:
-        filtered = filtered.sample(n=max_points.value, random_state=int(seed_box.value))
-
-    filtered = filtered.reset_index(drop=True)
-    # Options capped to keep the dropdown small
-    options = filtered["run_uid"].tolist()
-    selection = mo.ui.multiselect(
-        options=options[:5000],
-        value=options[: min(3, len(options))],
-        label="Selected runs (<=10)",
+    controls = dict(
+        dataset_filter=mo.ui.dropdown(options=["all", "math", "ood"], value="all", label="Dataset"),
+        rep_only=mo.ui.switch(value=False, label="Per-question representative only"),
+        correctness_filter=mo.ui.dropdown(options=["all", "correct", "incorrect"], value="all", label="Correctness"),
+        max_points=mo.ui.slider(200, 10000, value=5000, step=200, label="Max points to plot"),
+        seed_box=mo.ui.number(start=0, stop=10_000, step=1, value=42, label="Random seed"),
+        metrics_path=metrics_path,
     )
-    return df, filtered, selection
-
-
-@app.cell
-def __(filtered, mo, selection):
-    sel_ids = selection.value[:10]
-    notice = ""
-    if len(selection.value) > 10:
-        notice = f"Showing first 10 of {len(selection.value)} selections."
     mo.hstack(
         [
-            selection,
-            mo.md(f"{notice} {len(filtered)} points in view.")
+            controls["dataset_filter"],
+            controls["rep_only"],
+            controls["correctness_filter"],
+            controls["max_points"],
+            controls["seed_box"],
         ]
     )
-    return sel_ids
+    return controls, df_all
 
 
 @app.cell
-def __(alt, filtered, mo, pd, sel_ids):
-    if filtered.empty:
-        mo.alert("No rows to plot.")
-        chart_margin = None
+def _(df_all, mo):
+    mo.ui.dataframe(df_all)
+    return
+
+
+@app.cell
+def _(controls, df_all, mo):
+    df_filt = df_all.copy()
+    if controls["dataset_filter"].value != "all":
+        df_filt = df_filt[df_filt["dataset"] == controls["dataset_filter"].value]
+    if controls["rep_only"].value:
+        df_filt = df_filt[df_filt.get("is_representative", False)]
+    if controls["correctness_filter"].value == "correct":
+        df_filt = df_filt[df_filt["is_correct"]]
+    elif controls["correctness_filter"].value == "incorrect":
+        df_filt = df_filt[~df_filt["is_correct"]]
+
+    if len(df_filt) > controls["max_points"].value:
+        df_filt = df_filt.sample(n=int(controls["max_points"].value), random_state=int(controls["seed_box"].value))
+
+    df_filt = df_filt.reset_index(drop=True)
+    selection_widget = mo.ui.multiselect(
+        options=df_filt["run_uid"].tolist()[:5000],
+        value=df_filt["run_uid"].tolist()[: min(3, len(df_filt))],
+        label="Selected runs (<=10)",
+    )
+    mo.hstack(
+        [
+            selection_widget,
+            mo.md(
+                f"{len(df_filt)} rows | correct={df_filt['is_correct'].sum()} / incorrect={len(df_filt)-df_filt['is_correct'].sum()}"
+            ),
+        ]
+    )
+    return df_filt, selection_widget
+
+
+@app.cell
+def _(alt, df_filt, mo, pd, selection_widget):
+    sel_ids = selection_widget.value[:10]
+    if df_filt.empty:
+        margin_chart = None
+        view_margin = mo.alert("No rows to plot")
     else:
-        plot_df = filtered.copy()
-        plot_df["selected"] = plot_df["run_uid"].isin(sel_ids)
-        plot_df["question_snippet"] = plot_df["question"].str.slice(0, 120)
-        plot_df["think_snippet"] = plot_df["think_text"].str.slice(0, 120)
-        base = alt.Chart(plot_df).encode(
-            x=alt.X("probe_margin:Q", title="Probe margin (distance to boundary)"),
-            y=alt.Y("mean_think_entropy:Q", title="Mean think entropy"),
-            color=alt.Color("is_correct:N", scale=alt.Scale(domain=[True, False], range=["#1b9e77", "#d95f02"]), title="Correct"),
-            tooltip=[
-                "run_uid",
-                "question_id",
-                "dataset",
-                alt.Tooltip("probe_prob_correct:Q", format=".3f"),
-                alt.Tooltip("mean_think_entropy:Q", format=".3f"),
-                alt.Tooltip("semantic_entropy:Q", format=".3f"),
-                alt.Tooltip("question_snippet:N", title="Question"),
-                alt.Tooltip("think_snippet:N", title="Think"),
-                alt.Tooltip("answer_text:N", title="Answer"),
-            ],
-            size=alt.condition("datum.selected", alt.value(120), alt.value(40)),
-            opacity=alt.condition("datum.selected", alt.value(0.95), alt.value(0.6)),
+        zero_rule = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#555", strokeDash=[6, 4]).encode(x="x:Q")
+        margin_scatter = (
+            alt.Chart(df_filt)
+            .mark_circle()
+            .encode(
+                x=alt.X("probe_margin:Q", title="Probe margin"),
+                y=alt.Y("mean_think_entropy:Q", title="Mean think entropy"),
+                color=alt.Color("is_correct:N", scale=alt.Scale(domain=[True, False], range=["#1b9e77", "#d95f02"])),
+                tooltip=["run_uid", "question_id", "probe_margin", "mean_think_entropy", "is_correct"],
+                opacity=alt.condition(alt.FieldOneOfPredicate(field="run_uid", oneOf=sel_ids), alt.value(0.95), alt.value(0.5)),
+                size=alt.condition(alt.FieldOneOfPredicate(field="run_uid", oneOf=sel_ids), alt.value(120), alt.value(40)),
+            )
+            .properties(height=280, width="container")
         )
-        points = base.mark_circle()
-        boundary = alt.Chart(pd.DataFrame({"x": [0.0]})).mark_rule(color="#555", strokeDash=[6, 4]).encode(x="x")
-        chart_margin = (points + boundary).properties(height=320, width="container").interactive()
-        mo.md("### Margin vs entropy")
-        mo.ui.altair_chart(chart_margin)
-    return chart_margin
+        margin_chart = mo.ui.altair_chart(margin_scatter + zero_rule, chart_selection="interval")
+        view_margin = mo.vstack([mo.md("### Margin vs entropy (probe)"), margin_chart])
+    view_margin
+    return margin_chart, sel_ids
 
 
 @app.cell
-def __(alt, filtered, mo, sel_ids):
-    if filtered.empty:
-        mo.alert("No UMAP coordinates to plot.")
-        chart_umap = None
+def _(alt, df_filt, mo, sel_ids):
+    umap_widgets = []
+    if df_filt.empty:
+        view_umap = mo.alert("No UMAP coordinates to plot")
     else:
-        plot_df = filtered.copy()
-        plot_df["selected"] = plot_df["run_uid"].isin(sel_ids)
-        plot_df["question_snippet"] = plot_df["question"].str.slice(0, 120)
-        base = alt.Chart(plot_df).encode(
-            x=alt.X("umap_x:Q", title="UMAP-1"),
-            y=alt.Y("umap_y:Q", title="UMAP-2"),
-            color=alt.Color("is_correct:N", scale=alt.Scale(domain=[True, False], range=["#1b9e77", "#d95f02"]), title="Correct"),
-            tooltip=[
-                "run_uid",
-                "question_id",
-                "dataset",
-                alt.Tooltip("probe_prob_correct:Q", format=".3f"),
-                alt.Tooltip("mean_think_entropy:Q", format=".3f"),
-                alt.Tooltip("question_snippet:N", title="Question"),
-                alt.Tooltip("answer_text:N", title="Answer"),
-            ],
-            size=alt.condition("datum.selected", alt.value(120), alt.value(40)),
-            opacity=alt.condition("datum.selected", alt.value(0.95), alt.value(0.45)),
+        specs = [
+            ("probe_margin", "Probe margin"),
+            ("se_probe_margin", "SE probe margin"),
+            ("entropy_baseline_margin", "Entropy baseline margin"),
+        ]
+        for col, title in specs:
+            chart_spec = (
+                alt.Chart(df_filt)
+                .mark_circle()
+                .encode(
+                    x=alt.X("umap_x:Q", title="UMAP-1"),
+                    y=alt.Y("umap_y:Q", title="UMAP-2"),
+                    color=alt.Color(col + ":Q", title=title),
+                    tooltip=["run_uid", "question_id", col, "is_correct"],
+                    opacity=alt.condition(alt.FieldOneOfPredicate(field="run_uid", oneOf=sel_ids), alt.value(0.95), alt.value(0.5)),
+                    size=alt.condition(alt.FieldOneOfPredicate(field="run_uid", oneOf=sel_ids), alt.value(120), alt.value(40)),
+                )
+                .properties(height=300, width=300)
+            )
+            widget = mo.ui.altair_chart(chart_spec, chart_selection="interval")
+            umap_widgets.append(mo.vstack([mo.md(f"### UMAP colored by {title}"), widget]))
+        view_umap = mo.hstack(umap_widgets)
+    view_umap
+    return (umap_widgets,)
+
+
+@app.cell
+def _(alt, df_filt, mo):
+    if df_filt.empty:
+        se_scatter_widget = None
+        view_se = mo.alert("No data to plot SE vs margin")
+    else:
+        se_scatter = (
+            alt.Chart(df_filt)
+            .mark_circle()
+            .encode(
+                x=alt.X("semantic_entropy:Q", title="Semantic entropy"),
+                y=alt.Y("se_probe_margin:Q", title="SE probe margin"),
+                color="is_correct:N",
+                tooltip=["run_uid", "question_id", "semantic_entropy", "se_probe_margin", "is_correct"],
+            )
+            .properties(height=280, width="container")
         )
-        points = base.mark_circle()
-        chart_umap = points.properties(height=320, width="container").interactive()
-        mo.md("### UMAP (fixed embedding)")
-        mo.ui.altair_chart(chart_umap)
-    return chart_umap
+        se_scatter_widget = mo.ui.altair_chart(se_scatter, chart_selection="interval")
+        view_se = mo.vstack([mo.md("### SE vs SE-probe margin"), se_scatter_widget])
+    view_se
+    return (se_scatter_widget,)
 
 
 @app.cell
-def __(filtered, mo, sel_ids):
-    if filtered.empty:
-        mo.alert("No details to show.")
-        details = []
+def _(alt, df_filt, mo, pd, roc_curve):
+    if df_filt.empty:
+        view_roc = mo.alert("No rows for AUC plot")
     else:
-        selected_df = filtered[filtered["run_uid"].isin(sel_ids)].head(10)
-        rows = []
-        for _, row in selected_df.iterrows():
-            rows.append(
+        labels = df_filt["is_correct"].astype(int)
+        curves = []
+        for name, scores in {
+            "probe": df_filt["probe_prob_correct"],
+            "se_probe": df_filt["se_probe_prob_high"],
+            "entropy": df_filt["entropy_baseline_prob"],
+        }.items():
+            fpr, tpr, _ = roc_curve(labels, scores)
+            curves.append(pd.DataFrame({"fpr": fpr, "tpr": tpr, "probe": name}))
+        roc_df = pd.concat(curves, ignore_index=True)
+        roc_chart = (
+            alt.Chart(roc_df)
+            .mark_line()
+            .encode(x="fpr:Q", y="tpr:Q", color="probe:N")
+            .properties(height=240, width="container")
+        )
+        view_roc = mo.vstack([mo.md("### ROC curves (current filter)"), mo.ui.altair_chart(roc_chart)])
+    view_roc
+    return
+
+
+@app.cell
+def _(
+    df_filt,
+    margin_chart,
+    mo,
+    se_scatter_widget,
+    selection_widget,
+    umap_widgets,
+):
+    selected_ids = set(selection_widget.value)
+
+    def extract_ids(widget):
+        val = getattr(widget, "value", None)
+        if val is None:
+            return []
+        if hasattr(val, "get"):
+            ids = val.get("run_uid")
+        else:
+            ids = val
+        # Normalize to list
+        if ids is None:
+            return []
+        if isinstance(ids, (list, tuple)):
+            return list(ids)
+        try:
+            import pandas as pd  # type: ignore
+
+            if isinstance(ids, (pd.Series, pd.Index)):
+                return ids.tolist()
+        except Exception:
+            pass
+        try:
+            import numpy as np  # type: ignore
+
+            if isinstance(ids, np.ndarray):
+                return ids.tolist()
+        except Exception:
+            pass
+        return [ids]
+
+    for block in umap_widgets:
+        if hasattr(block, "value"):
+            ids = extract_ids(block)
+        elif isinstance(block, list) and len(block) == 2 and hasattr(block[1], "value"):
+            ids = extract_ids(block[1])
+        else:
+            ids = []
+        if isinstance(ids, (list, tuple)):
+            selected_ids.update(ids)
+
+    if margin_chart is not None:
+        ids = extract_ids(margin_chart)
+        if isinstance(ids, (list, tuple)):
+            selected_ids.update(ids)
+
+    if se_scatter_widget is not None:
+        ids = extract_ids(se_scatter_widget)
+        if isinstance(ids, (list, tuple)):
+            selected_ids.update(ids)
+
+    selected_ids = list(selected_ids)[:10]
+
+    if df_filt.empty or not selected_ids:
+        view_table = mo.alert("No selections yet.")
+    else:
+        cols = [
+            "run_uid",
+            "dataset",
+            "problem_type",
+            "is_correct",
+            "probe_margin",
+            "se_probe_margin",
+            "entropy_baseline_margin",
+            "semantic_entropy",
+            "mean_think_entropy",
+            "think_token_len",
+            "think_char_len",
+        ]
+        table_df = df_filt[df_filt["run_uid"].isin(selected_ids)][cols].copy()
+        view_table = mo.ui.table(table_df)
+    view_table
+    return
+
+
+@app.cell
+def _(controls, json, mo):
+    metrics_path_val = controls["metrics_path"]
+    if not metrics_path_val.exists():
+        view_metrics = mo.alert(f"Metrics file not found: {metrics_path_val}")
+    else:
+        with metrics_path_val.open("r", encoding="utf-8") as f:
+            metrics = json.load(f)
+        cards = []
+        for split, vals in metrics.items():
+            cards.append(
                 mo.md(
-                    f"""**{row.run_uid}** | Dataset: {row.dataset} | QID: {row.question_id} | Correct: {row.is_correct} | Probe prob: {row.probe_prob_correct:.3f} | Margin: {row.probe_margin:.3f}
-
-**Question:** {row.question}
-
-**Think:** {row.think_text}
-
-**Answer (model):** {row.answer_text}
-
-**Gold:** {row.gold_answer}
-
-Entropy (think): {row.mean_think_entropy:.3f} | Semantic entropy: {row.semantic_entropy}
-"""
+                    f"**{split}** | AUC acc={vals.get('auc_accuracy_probe','n/a')} | AUC se={vals.get('auc_se_probe','n/a')} | AUC ent={vals.get('auc_entropy_baseline','n/a')}"
                 )
             )
-        details = mo.vstack(rows) if rows else mo.md("No selections yet.")
-        mo.md("### Selected runs (max 10)")
-        details
-    return details
-
-
-@app.cell
-def __(json, metrics_path, mo, Path):
-    metrics_file = Path(metrics_path.value)
-    if not metrics_file.exists():
-        mo.alert(f"Metrics file not found: {metrics_file}")
-        metrics = {}
-    else:
-        with metrics_file.open("r", encoding="utf-8") as f:
-            metrics = json.load(f)
-    cards = []
-    for split, vals in metrics.items():
-        cards.append(
-            mo.md(
-                f"""**{split}**  
-AUROC (acc): {vals.get("auc_accuracy_probe", "n/a")}  
-AUROC (SE): {vals.get("auc_se_probe", "n/a")}  
-AUROC (entropy): {vals.get("auc_entropy_baseline", "n/a")}  
-"""
-            )
-        )
-    mo.md("### Probe metrics")
-    mo.hstack(cards) if cards else mo.md("No metrics loaded.")
-    return metrics
+        view_metrics = mo.vstack([mo.md("### Probe metrics"), mo.hstack(cards)])
+    view_metrics
+    return
 
 
 if __name__ == "__main__":

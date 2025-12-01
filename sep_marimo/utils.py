@@ -138,6 +138,28 @@ def extract_think_and_answer(full_text: str, think_start: str, think_end: str) -
     return think_text, answer_text
 
 
+def extract_full_answer(full_text: str, think_end: str = "</think>") -> str:
+    """Return everything after the last </think> (or empty string)."""
+    if not full_text:
+        return ""
+    if think_end in full_text:
+        return full_text.rsplit(think_end, 1)[-1].strip()
+    return full_text.strip()
+
+
+def extract_final_answer(full_answer: str) -> str:
+    """Pick the last boxed answer within the full answer portion."""
+    if not full_answer:
+        return ""
+    boxed = extract_boxed_balanced(full_answer)
+    if boxed:
+        return boxed
+    boxed = extract_last_boxed(full_answer)
+    if boxed:
+        return boxed
+    return ""
+
+
 def extract_answer_text(full_text: str) -> str:
     after = full_text
     if "</think>" in full_text:
@@ -180,6 +202,11 @@ def _normalize_numeric(text: str) -> Optional[float]:
 def answers_equivalent(pred: str, gold: str) -> bool:
     if not pred or not gold:
         return False
+    # Normalize LaTeX fraction macros (treat \dfrac == \frac)
+    def _norm_frac(s: str) -> str:
+        return s.replace("\\dfrac", "\\frac")
+    pred = _norm_frac(pred)
+    gold = _norm_frac(gold)
     mv = _maybe_import_math_verify()
     if mv is not None:
         parse, verify = mv
