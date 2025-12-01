@@ -23,6 +23,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--artifacts-dir", type=Path, default=None, help="Artifacts directory (hidden states, probe datasets)")
     p.add_argument("--models-dir", type=Path, default=None, help="Directory containing trained probes")
     p.add_argument("--out", type=Path, default=None, help="Output parquet path (default: artifacts/analysis/analysis.parquet)")
+    p.add_argument("--math-runs", type=Path, default=None, help="Optional override for math runs JSONL (cleaned)")
+    p.add_argument("--math-sem", type=Path, default=None, help="Optional override for math semantic entropy JSONL (cleaned)")
+    p.add_argument("--ood-runs", type=Path, default=None, help="Optional override for ood runs JSONL")
+    p.add_argument("--ood-sem", type=Path, default=None, help="Optional override for ood semantic entropy JSONL")
     p.add_argument("--max-rows", type=int, default=None, help="Optional cap on rows to include (random sample if set)")
     p.add_argument("--umap-neighbors", type=int, default=15, help="UMAP n_neighbors")
     p.add_argument("--umap-min-dist", type=float, default=0.1, help="UMAP min_dist")
@@ -232,23 +236,28 @@ def main() -> int:
 
     math_qmap = _load_questions(data_dir / "math_raw.jsonl")
     ood_qmap = _load_questions(data_dir / "ood_raw.jsonl") if (data_dir / "ood_raw.jsonl").exists() else {}
-    math_runs = _load_runs(data_dir / "math_runs.jsonl")
-    ood_runs = _load_runs(data_dir / "ood_runs.jsonl") if (data_dir / "ood_runs.jsonl").exists() else {}
+
+    math_runs_path = args.math_runs or data_dir / "math_runs.jsonl"
+    ood_runs_path = args.ood_runs or data_dir / "ood_runs.jsonl"
+    math_runs = _load_runs(math_runs_path)
+    ood_runs = _load_runs(ood_runs_path) if ood_runs_path.exists() else {}
 
     rows: List[Dict] = []
     feats: List[np.ndarray] = []
 
-    math_npz = artifacts_dir / "probe_datasets" / "math_test.npz"
-    if math_npz.exists():
-        math_data = _load_npz(math_npz)
+    for split_name in ["math_train", "math_val", "math_test"]:
+        path = artifacts_dir / "probe_datasets" / f"{split_name}.npz"
+        if not path.exists():
+            print(f"{split_name}.npz not found; skipping {split_name}")
+            continue
+        data = _load_npz(path)
+        tag = split_name
         math_rows, math_feats = _process_split(
-            "math_test", "math", math_data, math_runs, math_qmap, acc_probe, se_probe, ent_probe, tau
+            tag, "math", data, math_runs, math_qmap, acc_probe, se_probe, ent_probe, tau
         )
         rows.extend(math_rows)
         feats.append(math_feats)
-        print(f"Loaded {len(math_rows)} math_test rows")
-    else:
-        print("math_test.npz not found; skipping math")
+        print(f"Loaded {len(math_rows)} {tag} rows")
 
     ood_npz = artifacts_dir / "probe_datasets" / "ood_test.npz"
     if ood_npz.exists():

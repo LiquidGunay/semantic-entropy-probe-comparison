@@ -37,18 +37,6 @@ def _(Path, json, mo, os, pd):
         df_all = pd.DataFrame()
         data_notice = mo.alert(f"Analysis dataset not found: {data_path}. Set ANALYSIS_PARQUET or include the parquet in the image.")
 
-    topic_map = {}
-    level_map = {}
-    math_raw = Path("data/math_raw.jsonl")
-    if math_raw.exists():
-        records = [json.loads(line) for line in math_raw.open()]
-        topic_map = {str(rec.get("id")): rec.get("topic", "") for rec in records}
-        level_map = {str(rec.get("id")): rec.get("level", "") for rec in records}
-    df_all["problem_type"] = df_all["question_id"].astype(str).map(topic_map).fillna("")
-    df_all["difficulty"] = df_all["question_id"].astype(str).map(level_map).fillna("")
-    df_all["reason_tokens"] = df_all.get("think_token_len", 0)
-    df_all["reason_chars"] = df_all.get("think_char_len", 0)
-
     controls = dict(
         dataset_filter=mo.ui.dropdown(options=["all", "math", "ood"], value="all", label="Dataset"),
         rep_only=mo.ui.switch(value=False, label="Per-question representative only"),

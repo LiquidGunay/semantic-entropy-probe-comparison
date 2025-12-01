@@ -1,4 +1,4 @@
-# Python base with uv installed via pip (ghcr tag unavailable on Railway builder)
+# uv-based image for Railway / container deploys
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -18,7 +18,6 @@ RUN uv sync --locked --no-dev
 # Copy the rest
 COPY . .
 
-EXPOSE 8080
-ENV PORT=8080
+EXPOSE 6780
 
-CMD ["sh", "-c", "uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port ${PORT:-8080} --no-token --allow-origins=*"]
+CMD ["sh", "-c", "uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 6780 --no-token --allow-origins=*"]
