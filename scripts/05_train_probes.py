@@ -68,12 +68,14 @@ def main() -> int:
     se_probe = _train_logreg(X_train, y_high_se_train)
     ent_probe = _train_logreg(ent_train.reshape(-1, 1), y_train)
 
-    def _metrics(model, X, y_true):
-        probs = model.predict_proba(X)[:, 1]
-        return {
-            "roc_auc": float(roc_auc_score(y_true, probs)),
-            "auprc": float(average_precision_score(y_true, probs)),
-        }
+def _metrics(model, X, y_true):
+    if len(y_true) < 2 or len(np.unique(y_true)) < 2:
+        return {"roc_auc": float("nan"), "auprc": float("nan")}
+    probs = model.predict_proba(X)[:, 1]
+    return {
+        "roc_auc": float(roc_auc_score(y_true, probs)),
+        "auprc": float(average_precision_score(y_true, probs)),
+    }
 
     print("[val] accuracy probe:", _metrics(acc_probe, X_val, y_val))
     print("[val] se probe (label=high SE):", _metrics(se_probe, X_val, y_high_se_val))

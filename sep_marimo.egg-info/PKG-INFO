@@ -4,17 +4,22 @@ Version: 0.1.0
 Summary: Semantic Entropy Probes demo (marimo + nnsight + GPT-2)
 Author: Codex
 Requires-Python: >=3.10
-Requires-Dist: marimo>=0.7.13
-Requires-Dist: nnsight>=0.3.7
-Requires-Dist: torch==2.5.1
-Requires-Dist: transformers>=4.45.0
-Requires-Dist: datasets>=2.20.0
-Requires-Dist: accelerate>=1.0.0
-Requires-Dist: sentence-transformers>=3.0.1
-Requires-Dist: scikit-learn>=1.4.2
-Requires-Dist: plotly>=5.23.0
 Requires-Dist: altair>=5.3.0
-Requires-Dist: pandas>=2.2.2
-Requires-Dist: tqdm>=4.66.3
+Requires-Dist: joblib>=1.4.2
+Requires-Dist: marimo>=0.7.13
 Requires-Dist: numpy>=1.26.4
-Requires-Dist: scipy>=1.13.1
+Requires-Dist: pandas>=2.2.2
+Requires-Dist: pyarrow>=15.0.0
+Requires-Dist: scikit-learn>=1.4.2
+Requires-Dist: tqdm>=4.66.3
+Requires-Dist: umap-learn>=0.5.6
+Provides-Extra: pipeline
+Requires-Dist: accelerate==1.12.0; extra == "pipeline"
+Requires-Dist: datasets==2.20.0; extra == "pipeline"
+Requires-Dist: nnsight==0.3.7; extra == "pipeline"
+Requires-Dist: plotly==5.23.0; extra == "pipeline"
+Requires-Dist: scipy==1.13.1; extra == "pipeline"
+Requires-Dist: sentence-transformers==3.0.1; extra == "pipeline"
+Requires-Dist: torch==2.5.1; extra == "pipeline"
+Requires-Dist: transformers==4.45.0; extra == "pipeline"
+Requires-Dist: tqdm==4.66.3; extra == "pipeline"

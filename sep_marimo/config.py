@@ -17,7 +17,7 @@ class ExperimentConfig:
     num_runs_per_question: int = 10
     top_k_for_entropy: int = 20
     # Splits and randomness
-    train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15)
+    train_val_test_split: Tuple[float, float, float] = (0.8, 0.0, 0.2)
     random_seed: int = 42
     # Think tags
     think_start: str = "<think>"

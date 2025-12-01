@@ -5,24 +5,35 @@ description = "Semantic Entropy Probes demo (marimo + nnsight + GPT-2)"
 authors = [{name = "Codex"}]
 requires-python = ">=3.10"
 dependencies = [
-  "marimo>=0.7.13",
-  "nnsight>=0.3.7",
-  "torch==2.5.1",
-  "transformers>=4.45.0",
-  "datasets>=2.20.0",
-  "accelerate>=1.0.0",
-  "sentence-transformers>=3.0.1",
-  "scikit-learn>=1.4.2",
-  "plotly>=5.23.0",
   "altair>=5.3.0",
-  "pandas>=2.2.2",
-  "tqdm>=4.66.3",
+  "joblib>=1.4.2",
+  "marimo>=0.7.13",
   "numpy>=1.26.4",
-  "scipy>=1.13.1"
+  "pandas>=2.2.2",
+  "pyarrow>=15.0.0",
+  "scikit-learn>=1.4.2",
+  "tqdm>=4.66.3",
+  "umap-learn>=0.5.6"
+]
+
+[project.optional-dependencies]
+pipeline = [
+  "accelerate==1.12.0",
+  "datasets==2.20.0",
+  "nnsight==0.3.7",
+  "plotly==5.23.0",
+  "scipy==1.13.1",
+  "sentence-transformers==3.0.1",
+  "torch==2.5.1",
+  "transformers==4.45.0",
+  "tqdm==4.66.3"
 ]
 
 [tool.uv]
 package = true
+
+[tool.setuptools.packages.find]
+include = ["sep_marimo*"]
 
 [tool.uv.sources]
 # Torch GPU wheels often need a custom index; see README for GPU install command.

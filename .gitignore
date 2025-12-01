@@ -1,6 +1,7 @@
 .venv/
 .uv/
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 *.pyd
@@ -11,5 +12,5 @@ outputs/
 cache/
 checkpoints/
 .marimo/
-data/
-artifacts/
+.hf-cache/
+.uv-cache/

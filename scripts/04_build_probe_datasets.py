@@ -145,7 +145,7 @@ def main() -> int:
     # Balance classes per split if possible by borrowing from train
     for split in ["val", "test"]:
         y_list = store.get(f"y_{split}", [])
-        if y_list is None:
+        if not y_list:
             continue
         borrow = _ensure_two_classes(y_list, store, "train")
         if borrow:

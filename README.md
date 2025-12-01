@@ -6,9 +6,17 @@ Quickstart (from repo root):
 cd sep-marimo
 uv venv .venv
 source .venv/bin/activate
-# Install GPU torch build (recommended). Adjust CUDA version if needed.
+# Analysis-only install (small): marimo + altair + sklearn + umap
+uv sync
+
+# Pipeline install (adds torch/transformers/etc.)
+# GPU torch build (recommended) – adjust CUDA version if needed.
 uv pip install --index-url https://download.pytorch.org/whl/cu124 torch==2.5.1
-uv pip install -e .
+uv sync --extra pipeline
+
+# Editable install is optional if you prefer:
+# uv pip install -e . --extra pipeline
+
 # Launch marimo editor (with MCP server optional)
 uv run marimo edit probe_training_auto.py --mcp --no-token
 ```
@@ -62,6 +70,12 @@ cat artifacts/models/probe_eval.json
 ```
 
 Outputs land in `data/` (runs, semantic entropy) and `artifacts/` (hidden states, probe datasets, models, eval JSON). Install `vllm>=0.6.2` on a GPU host for step 2.
+
+8) **Build compact analysis dataset + notebook**
+```bash
+python scripts/07_build_analysis_dataset.py  # reads artifacts, writes artifacts/analysis/analysis.parquet
+uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 7860
+```
 
 ### Current smoke test (HF fallback, GTX 1660 Ti)
 - Synthetic 10 easy math questions, 10 runs each with `--backend hf --model Qwen/Qwen2-0.5B-Instruct --dtype float16 --max-new-tokens 32`.

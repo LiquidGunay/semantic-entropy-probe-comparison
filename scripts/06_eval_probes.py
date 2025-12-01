@@ -42,23 +42,23 @@ def _metrics(y_true: np.ndarray, scores: np.ndarray) -> Dict[str, float]:
     }
 
 
-def _bootstrap_p(y_true: np.ndarray, scores: np.ndarray, n: int = 500, seed: int = 42) -> float:
-    """One-sided p-value that AUROC > 0.5 via bootstrap."""
+def _perm_p_value(y_true: np.ndarray, scores: np.ndarray, n: int = 500, seed: int = 42) -> float:
+    """One-sided permutation p-value: Pr(AUROC_perm >= AUROC_obs)."""
     if len(np.unique(y_true)) < 2:
         return float("nan")
     rng = np.random.default_rng(seed)
-    aucs = []
+    obs = roc_auc_score(y_true, scores)
+    perm_aucs = []
     for _ in range(n):
-        idx = rng.integers(0, len(y_true), len(y_true))
-        yb = y_true[idx]
-        sb = scores[idx]
-        if len(np.unique(yb)) < 2:
+        y_perm = rng.permutation(y_true)
+        if len(np.unique(y_perm)) < 2:
             continue
-        aucs.append(roc_auc_score(yb, sb))
-    if not aucs:
+        perm_aucs.append(roc_auc_score(y_perm, scores))
+    if not perm_aucs:
         return float("nan")
-    aucs = np.asarray(aucs)
-    return float((aucs <= 0.5).mean())
+    perm_aucs = np.asarray(perm_aucs)
+    # add 1/(n+1) smoothing to avoid hard 0
+    return float((np.sum(perm_aucs >= obs) + 1) / (len(perm_aucs) + 1))
 
 
 def main() -> int:
@@ -88,13 +88,13 @@ def main() -> int:
         metrics = {
             "auc_accuracy_probe": _metrics(y, p_acc)["roc_auc"],
             "auprc_accuracy_probe": _metrics(y, p_acc)["auprc"],
-            "p_value_auc_accuracy": _bootstrap_p(y, p_acc),
+            "p_value_auc_accuracy": _perm_p_value(y, p_acc),
             "auc_se_probe": _metrics(y, conf_se)["roc_auc"],
             "auprc_se_probe": _metrics(y, conf_se)["auprc"],
-            "p_value_auc_se": _bootstrap_p(y, conf_se),
+            "p_value_auc_se": _perm_p_value(y, conf_se),
             "auc_entropy_baseline": _metrics(y, p_ent)["roc_auc"],
             "auprc_entropy_baseline": _metrics(y, p_ent)["auprc"],
-            "p_value_auc_entropy": _bootstrap_p(y, p_ent),
+            "p_value_auc_entropy": _perm_p_value(y, p_ent),
             "mean_conf_acc_correct": float(p_acc[y == 1].mean()) if (y == 1).any() else float("nan"),
             "mean_conf_acc_incorrect": float(p_acc[y == 0].mean()) if (y == 0).any() else float("nan"),
             "tau_answer": tau,

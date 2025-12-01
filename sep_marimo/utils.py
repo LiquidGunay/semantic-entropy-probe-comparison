@@ -98,7 +98,34 @@ def extract_last_boxed(text: str) -> str:
     return text[start:].strip()
 
 
+def extract_boxed_balanced(text: str) -> str:
+    m = re.search(r"\\boxed\s*\{", text)
+    if not m:
+        return ""
+    i = m.end()
+    depth = 1
+    while i < len(text) and depth > 0:
+        ch = text[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        i += 1
+    if depth == 0:
+        return text[m.end() : i - 1].strip()
+    return ""
+
+
 def extract_think_and_answer(full_text: str, think_start: str, think_end: str) -> Tuple[str, str]:
+    # Prefer the last complete <think> ... </think> block (models may echo tags earlier).
+    end_idx = full_text.rfind(think_end)
+    if end_idx != -1:
+        start_idx = full_text.rfind(think_start, 0, end_idx)
+        if start_idx != -1:
+            think_text = full_text[start_idx + len(think_start) : end_idx].strip()
+            answer_text = full_text[end_idx + len(think_end) :].strip()
+            return think_text, answer_text
+    # Fallback to first-match behavior
     start_idx = full_text.find(think_start)
     end_idx = full_text.find(think_end, start_idx + len(think_start)) if start_idx != -1 else -1
     think_text = ""
@@ -112,12 +139,15 @@ def extract_think_and_answer(full_text: str, think_start: str, think_end: str) -
 
 
 def extract_answer_text(full_text: str) -> str:
-    boxed = extract_last_boxed(full_text)
-    if boxed:
-        return boxed
     after = full_text
     if "</think>" in full_text:
         after = full_text.split("</think>", 1)[1]
+    boxed_balanced = extract_boxed_balanced(after)
+    if boxed_balanced:
+        return boxed_balanced
+    boxed = extract_last_boxed(after)
+    if boxed:
+        return boxed
     match = re.search(r"(?i)answer\s*[:：]\s*(.+)", after)
     if match:
         return match.group(1).strip()
@@ -201,9 +231,9 @@ def collate_runs_by_question(records: Iterable[Dict[str, Any]]) -> Dict[str, Lis
 
 def build_prompt(question: str, think_start: str, think_end: str) -> str:
     return (
-        "You are a helpful math reasoning assistant.\n"
-        "Solve the following problem step-by-step. Wrap your reasoning inside the"
-        f" {think_start} ... {think_end} tags and give a short final answer after {think_end}.\n\n"
+        "Solve the following math problem. Enclose your thoughts within"
+        f" {think_start}\\n\\n{think_end} tags. Your final answer should be denoted as **Answer:**"
+        " and must be enclosed in \\boxed{{}}.\n\n"
         "<question>\n"
         f"{question}\n"
         "</question>\n\n"
