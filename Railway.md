@@ -12,7 +12,8 @@
 4. Make sure the repo includes cleaned artifacts (`artifacts_clean/**`) in the image. If the build context excludes LFS, run `git lfs pull` before pushing or vendor the files another way.
 
 ## Build image assumptions
-- Python 3.12+ with `uv` installed (Railway’s default Nixpacks/Buildpacks will install from `uv.lock`).
+- Python 3.12+.
+- Nixpacks/Buildpacks will pick up `requirements.txt` (exported from `uv.lock`) and install via pip. If you prefer uv, keep the default command Nixpacks uses (`uv sync --locked`).
 - No GPU dependencies required.
 
 ## Local test (matches Railway)
