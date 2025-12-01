@@ -11,9 +11,9 @@
 3. In **Deployments**, ensure the start command uses the `Procfile` (Railway will pick up `web: ...`).
 4. Make sure the repo includes cleaned artifacts (`artifacts_clean/**`) in the image. If the build context excludes LFS, run `git lfs pull` before pushing or vendor the files another way.
 
-## Build image assumptions
-- Python 3.12+.
-- Nixpacks/Buildpacks will pick up `requirements.txt` (exported from `uv.lock`) and install via pip. If you prefer uv, keep the default command Nixpacks uses (`uv sync --locked`).
+## Build image (Dockerfile, uv-based)
+- Use the provided `Dockerfile` (uv python3.12-slim). It installs dependencies via `uv sync --locked --no-dev` from `pyproject.toml` and `uv.lock`.
+- Railway: choose **Deploy from repo → Dockerfile**; Railway supplies `PORT`. Dockerfile exposes 8080 and uses `$PORT` in the command.
 - No GPU dependencies required.
 
 ## Local test (matches Railway)

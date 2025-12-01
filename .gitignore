@@ -14,3 +14,14 @@ checkpoints/
 .marimo/
 .hf-cache/
 .uv-cache/
+.marimo.log
+artifacts/
+artifacts_clean/
+data/math_raw.jsonl
+data/math_runs.jsonl
+data/math_semantic_entropy.jsonl
+data/math_runs_clean.jsonl
+data/math_semantic_entropy_clean.jsonl
+data/ood_raw.jsonl
+notebooks/__marimo__/
+requirements.txt

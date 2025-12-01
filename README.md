@@ -99,9 +99,7 @@ uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 7860
 ```
 
 ### Deploy & embed (Railway)
-- Deployment command is provided in `Procfile`:\
-  `uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port $PORT --no-token --allow-origins="*"`
-- The app is read-only (`marimo run`) and CORS-open for iframe embedding. See `Railway.md` for setup steps.
+- Use the Dockerfile (uv-based) in the repo. Railway will build it and run the marimo app read-only with CORS open for iframe embedding. See `Railway.md`.
 - Example iframe snippet:
 ```html
 <iframe
