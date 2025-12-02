@@ -16,7 +16,7 @@
 
 ## Fresh deployment approach
 - **Shared launcher**: `scripts/serve_probe_analysis.sh` sets up PATH for the project venv, checks that the parquet/metrics exist, and starts marimo on `$PORT` with open CORS and no token.
-- **Dockerfile**: installs `uv`, runs `uv sync --frozen --no-dev`, sets `PATH` to the project `.venv`, marks the launcher executable, and uses it as `ENTRYPOINT`. Listens on `$PORT` (defaults to 6780).
+- **Dockerfile**: installs `uv`, runs `uv sync --frozen --no-dev`, sets `PATH` to the project `.venv`, disables joblib multiprocessing (`JOBLIB_MULTIPROCESSING=0`, `LOKY_MAX_CPU_COUNT=1`) to avoid semaphore/disk warnings, marks the launcher executable, and uses it as `ENTRYPOINT`. Listens on `$PORT` (defaults to 6780).
 - **Procfile**: `web: ./scripts/serve_probe_analysis.sh` — works if you prefer Railway’s Nixpacks instead of Docker.
 - Threading/caches: `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`.
 
@@ -25,6 +25,8 @@
 PORT=7860 ./scripts/serve_probe_analysis.sh
 ```
 Visit http://localhost:7860. Stop with Ctrl+C. If you only want to confirm assets are found, run `ANALYSIS_PARQUET=missing ./scripts/serve_probe_analysis.sh` to see the warning.
+
+If Railway logs show `joblib ... No space left on device`, that means the platform denies new POSIX semaphores or /dev/shm is tiny. The image already forces serial joblib; the warning should disappear after rebuilding with this Dockerfile.
 
 ## Embedding snippet
 Replace `YOUR_APP_URL` with your Railway domain (e.g., `https://your-app.up.railway.app`).

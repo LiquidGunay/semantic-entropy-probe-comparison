@@ -8,7 +8,9 @@ ENV UV_CACHE_DIR=/tmp/.uv-cache \
     UV_LINK_MODE=copy \
     NUMBA_NUM_THREADS=1 \
     OMP_NUM_THREADS=1 \
-    JOBLIB_TEMP_FOLDER=/tmp
+    JOBLIB_TEMP_FOLDER=/tmp \
+    JOBLIB_MULTIPROCESSING=0 \
+    LOKY_MAX_CPU_COUNT=1
 
 # System deps for build
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential curl && rm -rf /var/lib/apt/lists/*
