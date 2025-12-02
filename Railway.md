@@ -5,20 +5,19 @@
 - Uses cleaned data artifacts: `artifacts_clean/analysis/analysis.parquet` and `artifacts_clean/models/probe_eval.json`.
 - CORS is open (`--allow-origins="*"`) and tokens are disabled for iframe embedding.
 
-## One-time setup on Railway (Nixpacks)
+## One-time setup on Railway (Railpack)
 1. Create a Railway project and connect this repo.
-2. In **Settings → Nixpacks**, make sure build is enabled (no Dockerfile override required).
+2. In **Settings → Builder**, choose **Railpack** (or let Railway auto-detect the new `railpack.json`).
 3. No env vars are required; Railway injects `PORT`. Optional overrides:
    - `ALLOW_ORIGINS` (default `*`)
    - `ANALYSIS_PARQUET` (default `artifacts_clean/analysis/analysis.parquet`)
    - `METRICS_JSON` (default `artifacts_clean/models/probe_eval.json`)
 4. Ensure cleaned artifacts (`artifacts_clean/**`) are present. If your clone skipped LFS, run `git lfs pull` locally before pushing so the deploy includes the files.
-5. Start command comes from `Procfile`/`nixpacks.toml`: `./scripts/serve_probe_analysis.sh`.
+5. Start command comes from `Procfile`/`railpack.json`: `./scripts/serve_probe_analysis.sh`.
 
-## Fresh deployment approach (Nixpacks)
-- **Config**: `nixpacks.toml` installs Python 3.12, installs `uv`, runs `uv sync --frozen --no-dev`, and uses `./scripts/serve_probe_analysis.sh` as the start command.
-- **Procfile**: `web: ./scripts/serve_probe_analysis.sh` (Nixpacks will honor this).
-- **Env**: sets cache/thread caps and disables joblib multiprocessing to avoid /dev/shm warnings (`JOBLIB_MULTIPROCESSING=0`, `LOKY_MAX_CPU_COUNT=1`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`, `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`).
+## Fresh deployment approach (Railpack)
+- **Config**: `railpack.json` installs `uv` via pip, runs `uv sync --frozen --no-dev`, and starts `./scripts/serve_probe_analysis.sh`. Environment caps threads and disables joblib multiprocessing (`JOBLIB_MULTIPROCESSING=0`, `LOKY_MAX_CPU_COUNT=1`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`, `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`).
+- **Procfile**: `web: ./scripts/serve_probe_analysis.sh` (Railpack will honor this).
 
 ## Local test (mirrors Railway)
 ```

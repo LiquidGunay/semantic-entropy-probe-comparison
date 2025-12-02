@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "steps": {
+    "install": {
+      "commands": [
+        "pip install --upgrade pip uv",
+        "uv sync --frozen --no-dev"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "./scripts/serve_probe_analysis.sh",
+    "environment": {
+      "UV_CACHE_DIR": "/tmp/.uv-cache",
+      "UV_LINK_MODE": "copy",
+      "NUMBA_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "JOBLIB_MULTIPROCESSING": "0",
+      "LOKY_MAX_CPU_COUNT": "1",
+      "JOBLIB_TEMP_FOLDER": "/tmp"
+    }
+  }
+}
