@@ -95,11 +95,11 @@ Outputs land in `data/` (runs, semantic entropy) and `artifacts/` (hidden states
 8) **Build compact analysis dataset + notebook**
 ```bash
 python scripts/07_build_analysis_dataset.py  # reads artifacts, writes artifacts/analysis/analysis.parquet
-uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 7860
+PORT=7860 ./scripts/serve_probe_analysis.sh
 ```
 
 ### Deploy & embed (Railway)
-- Use the Dockerfile (uv-based) in the repo. It sets a writable uv cache (`UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`), caps threads (`NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`), and honors `$PORT` (default 8080). Skew protection is disabled for iframe embedding. See `Railway.md`.
+- Docker or Procfile both call `./scripts/serve_probe_analysis.sh`, which picks up `$PORT` (Railway-provided), opens CORS, and disables skew protection for iframe embedding. The Dockerfile bakes deps via `uv sync --locked --no-dev --frozen` and sets caches/threads (`UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`). See `Railway.md`.
 - Example iframe snippet:
 ```html
 <iframe

@@ -19,14 +19,22 @@ RUN pip install --no-cache-dir uv
 # Copy lockfiles first for caching
 COPY pyproject.toml uv.lock ./
 
-# Install project dependencies (no dev)
-RUN uv sync --locked --no-dev
+# Install project dependencies (no dev), honoring the lockfile
+RUN uv sync --locked --no-dev --frozen
+
+# Use the project venv by default for runtime binaries (marimo, python, etc.)
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 # Copy the rest
 COPY . .
 
-# Expose fixed port
-EXPOSE 6780
+# Ensure launcher is executable
+RUN chmod +x scripts/serve_probe_analysis.sh
 
-# Run on fixed port; disable skew protection for embeds
-CMD ["sh", "-c", "uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 6780 --no-token --allow-origins=* --no-skew-protection"]
+# Expose default port (Railway will override with $PORT)
+EXPOSE 6780
+ENV PORT=6780
+
+# Shared entrypoint for local and Railway deploys
+ENTRYPOINT ["./scripts/serve_probe_analysis.sh"]

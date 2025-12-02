@@ -5,24 +5,26 @@
 - Uses cleaned data artifacts: `artifacts_clean/analysis/analysis.parquet` and `artifacts_clean/models/probe_eval.json`.
 - CORS is open (`--allow-origins="*"`) and tokens are disabled for iframe embedding.
 
-## One-time setup on Railway
-1. Create a new Railway project and connect this repo.
-2. In **Variables**, add `PORT` (Railway auto-provides). No other env vars required.
-3. In **Deployments**, ensure the start command uses the `Procfile` (Railway will pick up `web: ...`).
-4. Make sure the repo includes cleaned artifacts (`artifacts_clean/**`) in the image. If the build context excludes LFS, run `git lfs pull` before pushing or vendor the files another way.
+## One-time setup on Railway (new entrypoint)
+1. Create a Railway project and connect this repo.
+2. Choose **Deploy from repo → Dockerfile** (or keep Nixpacks + Procfile; both now share the same entrypoint).
+3. No env vars are required; Railway injects `PORT`. Optional overrides:
+   - `ALLOW_ORIGINS` (default `*`)
+   - `ANALYSIS_PARQUET` (default `artifacts_clean/analysis/analysis.parquet`)
+   - `METRICS_JSON` (default `artifacts_clean/models/probe_eval.json`)
+4. Ensure cleaned artifacts (`artifacts_clean/**`) are present. If your clone skipped LFS, run `git lfs pull` locally before pushing so the image bakes in the files.
 
-## Build image (Dockerfile, uv via pip)
-- The `Dockerfile` uses `python:3.12-slim`, installs `uv` via pip, runs `uv sync --locked --no-dev`, and serves the marimo app.
-- CMD uses fixed port 6780 and disables skew protection (`--no-skew-protection`) for iframe/client cache friendliness. Cache is set to `/tmp/.uv-cache` (`UV_CACHE_DIR`, `UV_LINK_MODE=copy`), and threading is capped (`NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`) to avoid shared-memory warnings.
-- Railway: choose **Deploy from repo → Dockerfile**.
-- No GPU dependencies required.
+## Fresh deployment approach
+- **Shared launcher**: `scripts/serve_probe_analysis.sh` sets up PATH for the project venv, checks that the parquet/metrics exist, and starts marimo on `$PORT` with open CORS and no token.
+- **Dockerfile**: installs `uv`, runs `uv sync --locked --no-dev --frozen`, sets `PATH` to the project `.venv`, marks the launcher executable, and uses it as `ENTRYPOINT`. Listens on `$PORT` (defaults to 6780).
+- **Procfile**: `web: ./scripts/serve_probe_analysis.sh` — works if you prefer Railway’s Nixpacks instead of Docker.
+- Threading/caches: `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`.
 
-## Local test (matches Railway)
+## Local test (mirrors Railway)
 ```
-uv run marimo run notebooks/probe_analysis.py \
-  --host 0.0.0.0 --port 7860 --no-token --allow-origins="*"
+PORT=7860 ./scripts/serve_probe_analysis.sh
 ```
-Visit http://localhost:7860.
+Visit http://localhost:7860. Stop with Ctrl+C. If you only want to confirm assets are found, run `ANALYSIS_PARQUET=missing ./scripts/serve_probe_analysis.sh` to see the warning.
 
 ## Embedding snippet
 Replace `YOUR_APP_URL` with your Railway domain (e.g., `https://your-app.up.railway.app`).
