@@ -13,8 +13,8 @@
 
 ## Build image (Dockerfile, uv via pip)
 - The `Dockerfile` uses `python:3.12-slim`, installs `uv` via pip, runs `uv sync --locked --no-dev`, and serves the marimo app.
-- Command uses port 6780 and disables skew protection (`--no-skew-protection`) for iframe/client cache friendliness. Cache is set to `/tmp/.uv-cache` (`UV_CACHE_DIR`, `UV_LINK_MODE=copy`) for writable installs on Railway.
-- Railway: choose **Deploy from repo → Dockerfile**; no extra env needed unless your platform forces `$PORT`.
+- CMD uses fixed port 6780 and disables skew protection (`--no-skew-protection`) for iframe/client cache friendliness. Cache is set to `/tmp/.uv-cache` (`UV_CACHE_DIR`, `UV_LINK_MODE=copy`), and threading is capped (`NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`) to avoid shared-memory warnings.
+- Railway: choose **Deploy from repo → Dockerfile**.
 - No GPU dependencies required.
 
 ## Local test (matches Railway)

@@ -209,64 +209,10 @@ def _(alt, df_filt, mo, pd, roc_curve):
 @app.cell
 def _(
     df_filt,
-    margin_chart,
     mo,
-    se_scatter_widget,
     selection_widget,
-    umap_widgets,
 ):
-    selected_ids = set(selection_widget.value)
-
-    def extract_ids(widget):
-        val = getattr(widget, "value", None)
-        if val is None:
-            return []
-        if hasattr(val, "get"):
-            ids = val.get("run_uid")
-        else:
-            ids = val
-        # Normalize to list
-        if ids is None:
-            return []
-        if isinstance(ids, (list, tuple)):
-            return list(ids)
-        try:
-            import pandas as pd  # type: ignore
-
-            if isinstance(ids, (pd.Series, pd.Index)):
-                return ids.tolist()
-        except Exception:
-            pass
-        try:
-            import numpy as np  # type: ignore
-
-            if isinstance(ids, np.ndarray):
-                return ids.tolist()
-        except Exception:
-            pass
-        return [ids]
-
-    for block in umap_widgets:
-        if hasattr(block, "value"):
-            ids = extract_ids(block)
-        elif isinstance(block, list) and len(block) == 2 and hasattr(block[1], "value"):
-            ids = extract_ids(block[1])
-        else:
-            ids = []
-        if isinstance(ids, (list, tuple)):
-            selected_ids.update(ids)
-
-    if margin_chart is not None:
-        ids = extract_ids(margin_chart)
-        if isinstance(ids, (list, tuple)):
-            selected_ids.update(ids)
-
-    if se_scatter_widget is not None:
-        ids = extract_ids(se_scatter_widget)
-        if isinstance(ids, (list, tuple)):
-            selected_ids.update(ids)
-
-    selected_ids = list(selected_ids)[:10]
+    selected_ids = list(selection_widget.value)[:10]
 
     if df_filt.empty or not selected_ids:
         view_table = mo.alert("No selections yet.")
@@ -284,6 +230,9 @@ def _(
             "think_token_len",
             "think_char_len",
         ]
+        missing = [c for c in cols if c not in df_filt.columns]
+        for c in missing:
+            df_filt[c] = "" if "type" in c else 0
         table_df = df_filt[df_filt["run_uid"].isin(selected_ids)][cols].copy()
         view_table = mo.ui.table(table_df)
     view_table

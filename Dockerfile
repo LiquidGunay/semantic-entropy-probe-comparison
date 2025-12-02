@@ -3,10 +3,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Use a writable cache (Railway containers may block $HOME/.cache)
-ENV UV_CACHE_DIR=/tmp/.uv-cache
-ENV UV_LINK_MODE=copy
-RUN mkdir -p $UV_CACHE_DIR
+# Writable cache and conservative threading for joblib/numba
+ENV UV_CACHE_DIR=/tmp/.uv-cache \
+    UV_LINK_MODE=copy \
+    NUMBA_NUM_THREADS=1 \
+    OMP_NUM_THREADS=1 \
+    JOBLIB_TEMP_FOLDER=/tmp
 
 # System deps for build
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential curl && rm -rf /var/lib/apt/lists/*
@@ -23,6 +25,8 @@ RUN uv sync --locked --no-dev
 # Copy the rest
 COPY . .
 
+# Expose fixed port
 EXPOSE 6780
 
+# Run on fixed port; disable skew protection for embeds
 CMD ["sh", "-c", "uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 6780 --no-token --allow-origins=* --no-skew-protection"]

@@ -99,7 +99,7 @@ uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 7860
 ```
 
 ### Deploy & embed (Railway)
-- Use the Dockerfile (uv-based) in the repo. It sets `UV_CACHE_DIR=/tmp/.uv-cache` and `UV_LINK_MODE=copy` for writable caches on Railway. Railway will build it and run the marimo app read-only with CORS open for iframe embedding. See `Railway.md`.
+- Use the Dockerfile (uv-based) in the repo. It sets a writable uv cache (`UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`), caps threads (`NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`), and honors `$PORT` (default 8080). Skew protection is disabled for iframe embedding. See `Railway.md`.
 - Example iframe snippet:
 ```html
 <iframe
