@@ -99,7 +99,7 @@ PORT=7860 ./scripts/serve_probe_analysis.sh
 ```
 
 ### Deploy & embed (Railway)
-- Docker or Procfile both call `./scripts/serve_probe_analysis.sh`, which picks up `$PORT` (Railway-provided), opens CORS, and disables skew protection for iframe embedding. The Dockerfile bakes deps via `uv sync --locked --no-dev --frozen` and sets caches/threads (`UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`). See `Railway.md`.
+- Docker or Procfile both call `./scripts/serve_probe_analysis.sh`, which picks up `$PORT` (Railway-provided), opens CORS, and disables skew protection for iframe embedding. The Dockerfile bakes deps via `uv sync --frozen --no-dev` and sets caches/threads (`UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`). See `Railway.md`.
 - Example iframe snippet:
 ```html
 <iframe

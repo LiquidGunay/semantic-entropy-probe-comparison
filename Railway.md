@@ -16,7 +16,7 @@
 
 ## Fresh deployment approach
 - **Shared launcher**: `scripts/serve_probe_analysis.sh` sets up PATH for the project venv, checks that the parquet/metrics exist, and starts marimo on `$PORT` with open CORS and no token.
-- **Dockerfile**: installs `uv`, runs `uv sync --locked --no-dev --frozen`, sets `PATH` to the project `.venv`, marks the launcher executable, and uses it as `ENTRYPOINT`. Listens on `$PORT` (defaults to 6780).
+- **Dockerfile**: installs `uv`, runs `uv sync --frozen --no-dev`, sets `PATH` to the project `.venv`, marks the launcher executable, and uses it as `ENTRYPOINT`. Listens on `$PORT` (defaults to 6780).
 - **Procfile**: `web: ./scripts/serve_probe_analysis.sh` — works if you prefer Railway’s Nixpacks instead of Docker.
 - Threading/caches: `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`.
 

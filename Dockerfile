@@ -19,8 +19,8 @@ RUN pip install --no-cache-dir uv
 # Copy lockfiles first for caching
 COPY pyproject.toml uv.lock ./
 
-# Install project dependencies (no dev), honoring the lockfile
-RUN uv sync --locked --no-dev --frozen
+# Install project dependencies (no dev), honoring the lockfile (frozen = fail if lock mismatch)
+RUN uv sync --frozen --no-dev
 
 # Use the project venv by default for runtime binaries (marimo, python, etc.)
 ENV VIRTUAL_ENV=/app/.venv
