@@ -2,6 +2,9 @@
   "$schema": "https://schema.railpack.com",
   "steps": {
     "install": {
+      "inputs": [
+        { "local": true, "include": ["."] }
+      ],
       "commands": [
         "pip install --upgrade pip uv",
         "uv sync --frozen --no-dev"
@@ -9,6 +12,9 @@
     }
   },
   "deploy": {
+    "inputs": [
+      { "step": "install", "include": ["."] }
+    ],
     "startCommand": "./scripts/serve_probe_analysis.sh",
     "environment": {
       "UV_CACHE_DIR": "/tmp/.uv-cache",
