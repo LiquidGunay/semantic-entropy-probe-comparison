@@ -15,7 +15,21 @@ ALLOW_ORIGINS="${ALLOW_ORIGINS:-*}"
 ANALYSIS_PARQUET="${ANALYSIS_PARQUET:-artifacts_clean/analysis/analysis.parquet}"
 METRICS_JSON="${METRICS_JSON:-artifacts_clean/models/probe_eval.json}"
 # Use an app-local tmpdir to avoid small /tmp or shm limits on hosts like Railway.
-APP_TMP="${APP_TMP:-/app/tmp}"
+DATA_ROOT="${DATA_ROOT:-/data}"
+APP_ROOT="${APP_ROOT:-${DATA_ROOT}/app}"
+APP_TMP="${APP_TMP:-${DATA_ROOT}/tmp}"
+
+if [ -w "${DATA_ROOT}" ]; then
+  mkdir -p "${APP_ROOT}"
+  # Copy code and assets into the writable volume if not already synced.
+  if [ ! -f "${APP_ROOT}/.copied" ]; then
+    echo "Copying app into ${APP_ROOT}..."
+    cp -a /app/. "${APP_ROOT}/"
+    touch "${APP_ROOT}/.copied"
+  fi
+  cd "${APP_ROOT}"
+fi
+
 mkdir -p "${APP_TMP}"
 export TMPDIR="${TMPDIR:-${APP_TMP}}"
 export MARIMO_TMPDIR="${MARIMO_TMPDIR:-${APP_TMP}}"
