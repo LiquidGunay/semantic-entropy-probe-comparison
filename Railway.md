@@ -7,7 +7,8 @@
 
 ## One-time setup on Railway (Procfile / Nixpacks default)
 1. Create a Railway project and connect this repo.
-2. Keep the default Nixpacks builder; it will detect Python from `pyproject.toml` and the `Procfile`.
+2. Keep the default Nixpacks builder; it will detect Python from `pyproject.toml`/`.python-version` and the `Procfile`.
+   - Set env var `PYTHON_VERSION=3.12` (or rely on the `.python-version` file). This avoids building SciPy/Numba from source on Python 3.13, which lacks wheels and needs gfortran.
 3. No env vars are required; Railway injects `PORT`. Optional overrides:
    - `ALLOW_ORIGINS` (default `*`)
    - `ANALYSIS_PARQUET` (default `artifacts_clean/analysis/analysis.parquet`)
