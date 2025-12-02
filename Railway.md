@@ -5,19 +5,20 @@
 - Uses cleaned data artifacts: `artifacts_clean/analysis/analysis.parquet` and `artifacts_clean/models/probe_eval.json`.
 - CORS is open (`--allow-origins="*"`) and tokens are disabled for iframe embedding.
 
-## One-time setup on Railway (Railpack)
+## One-time setup on Railway (Procfile / Nixpacks default)
 1. Create a Railway project and connect this repo.
-2. In **Settings → Builder**, choose **Railpack** (or let Railway auto-detect the new `railpack.json`).
+2. Keep the default Nixpacks builder; it will detect Python from `pyproject.toml` and the `Procfile`.
 3. No env vars are required; Railway injects `PORT`. Optional overrides:
    - `ALLOW_ORIGINS` (default `*`)
    - `ANALYSIS_PARQUET` (default `artifacts_clean/analysis/analysis.parquet`)
    - `METRICS_JSON` (default `artifacts_clean/models/probe_eval.json`)
 4. Ensure cleaned artifacts (`artifacts_clean/**`) are present. If your clone skipped LFS, run `git lfs pull` locally before pushing so the deploy includes the files.
-5. Start command comes from `Procfile`/`railpack.json`: `./scripts/serve_probe_analysis.sh`.
+5. Start command comes from `Procfile`: `./scripts/serve_probe_analysis.sh`.
 
-## Fresh deployment approach (Railpack)
-- **Config**: `railpack.json` installs `uv` via pip, runs `uv sync --frozen --no-dev`, and starts `./scripts/serve_probe_analysis.sh`. Environment caps threads and disables joblib multiprocessing (`JOBLIB_MULTIPROCESSING=0`, `LOKY_MAX_CPU_COUNT=1`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`, `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`).
-- **Procfile**: `web: ./scripts/serve_probe_analysis.sh` (Railpack will honor this).
+## Fresh deployment approach (Procfile only)
+- **Build**: Nixpacks detects Python, installs `uv`, and runs `uv sync --frozen --no-dev`.
+- **Run**: `web: ./scripts/serve_probe_analysis.sh` (picks up `$PORT`, open CORS, no token). Threading/joblib env handled inside the script defaults and environment section below.
+- **Env**: to avoid /dev/shm warnings, set (Railway → Variables): `JOBLIB_MULTIPROCESSING=0`, `LOKY_MAX_CPU_COUNT=1`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`, `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy` (mirrors local setup).
 
 ## Local test (mirrors Railway)
 ```

@@ -15,7 +15,6 @@ Run and compare uncertainty signals (accuracy probe, semantic-entropy probe, ent
 
 ## Non-Goals (for now)
 - Exact reproduction of full-scale results from the paper.
-- Large-model experiments (GPT-2 XL+) or extensive hyperparameter sweeps.
 - Production-grade packaging; focus remains on exploratory, readable notebook.
 
 ## Marimo rules to follow
