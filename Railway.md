@@ -13,7 +13,8 @@
 
 ## Build image (Dockerfile, uv via pip)
 - The `Dockerfile` uses `python:3.12-slim`, installs `uv` via pip, runs `uv sync --locked --no-dev`, and serves the marimo app.
-- Railway: choose **Deploy from repo → Dockerfile**; Railway supplies `PORT`. Dockerfile exposes 8080 and uses `$PORT` in the command.
+- Command uses port 6780 and disables skew protection (`--no-skew-protection`) for iframe/client cache friendliness.
+- Railway: choose **Deploy from repo → Dockerfile**; no extra env needed. If your platform requires `$PORT`, adjust the CMD accordingly.
 - No GPU dependencies required.
 
 ## Local test (matches Railway)

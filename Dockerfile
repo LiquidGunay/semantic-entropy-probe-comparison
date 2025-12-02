@@ -20,4 +20,4 @@ COPY . .
 
 EXPOSE 6780
 
-CMD ["sh", "-c", "uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 6780 --no-token --allow-origins=*"]
+CMD ["sh", "-c", "uv run marimo run notebooks/probe_analysis.py --host 0.0.0.0 --port 6780 --no-token --allow-origins=* --no-skew-protection"]
