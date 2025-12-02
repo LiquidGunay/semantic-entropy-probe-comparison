@@ -3,6 +3,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Use a writable cache (Railway containers may block $HOME/.cache)
+ENV UV_CACHE_DIR=/tmp/.uv-cache
+ENV UV_LINK_MODE=copy
+RUN mkdir -p $UV_CACHE_DIR
+
 # System deps for build
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential curl && rm -rf /var/lib/apt/lists/*
 
