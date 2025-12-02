@@ -5,20 +5,20 @@
 - Uses cleaned data artifacts: `artifacts_clean/analysis/analysis.parquet` and `artifacts_clean/models/probe_eval.json`.
 - CORS is open (`--allow-origins="*"`) and tokens are disabled for iframe embedding.
 
-## One-time setup on Railway (new entrypoint)
+## One-time setup on Railway (Nixpacks)
 1. Create a Railway project and connect this repo.
-2. Choose **Deploy from repo → Dockerfile** (or keep Nixpacks + Procfile; both now share the same entrypoint).
+2. In **Settings → Nixpacks**, make sure build is enabled (no Dockerfile override required).
 3. No env vars are required; Railway injects `PORT`. Optional overrides:
    - `ALLOW_ORIGINS` (default `*`)
    - `ANALYSIS_PARQUET` (default `artifacts_clean/analysis/analysis.parquet`)
    - `METRICS_JSON` (default `artifacts_clean/models/probe_eval.json`)
-4. Ensure cleaned artifacts (`artifacts_clean/**`) are present. If your clone skipped LFS, run `git lfs pull` locally before pushing so the image bakes in the files.
+4. Ensure cleaned artifacts (`artifacts_clean/**`) are present. If your clone skipped LFS, run `git lfs pull` locally before pushing so the deploy includes the files.
+5. Start command comes from `Procfile`/`nixpacks.toml`: `./scripts/serve_probe_analysis.sh`.
 
-## Fresh deployment approach
-- **Shared launcher**: `scripts/serve_probe_analysis.sh` sets up PATH for the project venv, checks that the parquet/metrics exist, and starts marimo on `$PORT` with open CORS and no token.
-- **Dockerfile**: installs `uv`, runs `uv sync --frozen --no-dev`, sets `PATH` to the project `.venv`, disables joblib multiprocessing (`JOBLIB_MULTIPROCESSING=0`, `LOKY_MAX_CPU_COUNT=1`) to avoid semaphore/disk warnings, marks the launcher executable, and uses it as `ENTRYPOINT`. Listens on `$PORT` (defaults to 6780).
-- **Procfile**: `web: ./scripts/serve_probe_analysis.sh` — works if you prefer Railway’s Nixpacks instead of Docker.
-- Threading/caches: `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`.
+## Fresh deployment approach (Nixpacks)
+- **Config**: `nixpacks.toml` installs Python 3.12, installs `uv`, runs `uv sync --frozen --no-dev`, and uses `./scripts/serve_probe_analysis.sh` as the start command.
+- **Procfile**: `web: ./scripts/serve_probe_analysis.sh` (Nixpacks will honor this).
+- **Env**: sets cache/thread caps and disables joblib multiprocessing to avoid /dev/shm warnings (`JOBLIB_MULTIPROCESSING=0`, `LOKY_MAX_CPU_COUNT=1`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`, `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`).
 
 ## Local test (mirrors Railway)
 ```
@@ -26,7 +26,7 @@ PORT=7860 ./scripts/serve_probe_analysis.sh
 ```
 Visit http://localhost:7860. Stop with Ctrl+C. If you only want to confirm assets are found, run `ANALYSIS_PARQUET=missing ./scripts/serve_probe_analysis.sh` to see the warning.
 
-If Railway logs show `joblib ... No space left on device`, that means the platform denies new POSIX semaphores or /dev/shm is tiny. The image already forces serial joblib; the warning should disappear after rebuilding with this Dockerfile.
+If Railway logs show `joblib ... No space left on device`, that means the platform denies new POSIX semaphores or /dev/shm is tiny. The Nixpacks config already forces serial joblib; the warning should disappear after this deploy.
 
 ## Embedding snippet
 Replace `YOUR_APP_URL` with your Railway domain (e.g., `https://your-app.up.railway.app`).

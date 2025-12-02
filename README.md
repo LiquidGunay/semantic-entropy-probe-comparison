@@ -99,7 +99,7 @@ PORT=7860 ./scripts/serve_probe_analysis.sh
 ```
 
 ### Deploy & embed (Railway)
-- Docker or Procfile both call `./scripts/serve_probe_analysis.sh`, which picks up `$PORT` (Railway-provided), opens CORS, and disables skew protection for iframe embedding. The Dockerfile bakes deps via `uv sync --frozen --no-dev`, sets caches/threads (`UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`, `NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_TEMP_FOLDER=/tmp`), and disables joblib multiprocessing (`JOBLIB_MULTIPROCESSING=0`, `LOKY_MAX_CPU_COUNT=1`) to avoid semaphore/disk warnings on small /dev/shm. See `Railway.md`.
+- Nixpacks + Procfile: `nixpacks.toml` installs Python 3.12, installs `uv`, runs `uv sync --frozen --no-dev`, and starts via `./scripts/serve_probe_analysis.sh` (also in Procfile). CORS open, no token, skew protection off. Env caps threads and disables joblib multiprocessing (`NUMBA_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `JOBLIB_MULTIPROCESSING=0`, `LOKY_MAX_CPU_COUNT=1`, `JOBLIB_TEMP_FOLDER=/tmp`, `UV_CACHE_DIR=/tmp/.uv-cache`, `UV_LINK_MODE=copy`). See `Railway.md`.
 - Example iframe snippet:
 ```html
 <iframe
