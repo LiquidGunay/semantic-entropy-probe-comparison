@@ -10,27 +10,43 @@ elif [ -n "${VIRTUAL_ENV:-}" ] && [ -d "${VIRTUAL_ENV}/bin" ]; then
   export PATH="${VIRTUAL_ENV}/bin:$PATH"
 fi
 
+MARIMO_MODE="${MARIMO_MODE:-run}"
+MARIMO_NOTEBOOK="${MARIMO_NOTEBOOK:-notebooks/probe_analysis.py}"
+
 PORT="${PORT:-6780}"
 ALLOW_ORIGINS="${ALLOW_ORIGINS:-*}"
 ANALYSIS_PARQUET="${ANALYSIS_PARQUET:-artifacts_clean/analysis/analysis.parquet}"
 METRICS_JSON="${METRICS_JSON:-artifacts_clean/models/probe_eval.json}"
 # Use an app-local tmpdir to avoid small /tmp or shm limits on hosts like Railway.
-DATA_ROOT="${DATA_ROOT:-/data}"
+DEFAULT_DATA_ROOT="/data"
+if [ -n "${DATA_ROOT:-}" ]; then
+  : # user-provided
+elif [ -d "${DEFAULT_DATA_ROOT}" ] && [ -w "${DEFAULT_DATA_ROOT}" ]; then
+  DATA_ROOT="${DEFAULT_DATA_ROOT}"
+else
+  DATA_ROOT="/tmp/sep-marimo"
+fi
+
+SRC_ROOT="/app"
+if [ ! -d "${SRC_ROOT}" ]; then
+  SRC_ROOT="$(pwd)"
+fi
+
 APP_ROOT="${APP_ROOT:-${DATA_ROOT}/app}"
 APP_TMP="${APP_TMP:-${DATA_ROOT}/tmp}"
 APP_CACHE="${APP_CACHE:-${DATA_ROOT}/uv-cache}"
 APP_SHM="${APP_SHM:-${DATA_ROOT}/shm}"
 
-if [ -w "${DATA_ROOT}" ]; then
-  mkdir -p "${APP_ROOT}"
-  mkdir -p "${APP_CACHE}"
-  mkdir -p "${APP_SHM}"
-  # Copy code and assets into the writable volume if not already synced.
-  if [ ! -f "${APP_ROOT}/.copied" ]; then
-    echo "Copying app into ${APP_ROOT}..."
-    cp -a /app/. "${APP_ROOT}/"
-    touch "${APP_ROOT}/.copied"
-  fi
+if [ -d "${DATA_ROOT}" ] && [ -w "${DATA_ROOT}" ] && [ "${STAGE_APP_TO_DATA:-1}" = "1" ]; then
+  mkdir -p "${APP_ROOT}" "${APP_CACHE}" "${APP_SHM}"
+  echo "Syncing app files into ${APP_ROOT}..."
+  rm -rf "${APP_ROOT}/notebooks" "${APP_ROOT}/scripts" "${APP_ROOT}/sep_marimo" "${APP_ROOT}/artifacts_clean"
+  cp -a "${SRC_ROOT}/notebooks" "${APP_ROOT}/"
+  cp -a "${SRC_ROOT}/scripts" "${APP_ROOT}/"
+  cp -a "${SRC_ROOT}/sep_marimo" "${APP_ROOT}/"
+  cp -a "${SRC_ROOT}/artifacts_clean" "${APP_ROOT}/"
+  cp -a "${SRC_ROOT}/pyproject.toml" "${SRC_ROOT}/uv.lock" "${APP_ROOT}/" 2>/dev/null || true
+  cp -a "${SRC_ROOT}/.python-version" "${APP_ROOT}/" 2>/dev/null || true
   cd "${APP_ROOT}"
 fi
 
@@ -54,8 +70,8 @@ export XDG_DATA_HOME="${XDG_DATA_HOME:-${APP_TMP}/xdg-data}"
 [ -f "$ANALYSIS_PARQUET" ] || echo "Warning: analysis parquet missing at $ANALYSIS_PARQUET"
 [ -f "$METRICS_JSON" ] || echo "Warning: metrics JSON missing at $METRICS_JSON"
 
-echo "Starting marimo on port ${PORT} (origins=${ALLOW_ORIGINS})"
-exec marimo run notebooks/probe_analysis.py \
+echo "Starting marimo (${MARIMO_MODE}) on port ${PORT} (origins=${ALLOW_ORIGINS})"
+exec marimo "${MARIMO_MODE}" "${MARIMO_NOTEBOOK}" \
   --host 0.0.0.0 \
   --port "${PORT}" \
   --no-token \
