@@ -13,6 +13,7 @@
    - `ALLOW_ORIGINS` (default `*`)
    - `ANALYSIS_PARQUET` (default `artifacts_clean/analysis/analysis.parquet`)
    - `METRICS_JSON` (default `artifacts_clean/models/probe_eval.json`)
+   - `MARIMO_NO_SHM=1` (recommended on Railway; disables `/dev/shm` usage by inlining virtual files)
 4. Ensure cleaned artifacts (`artifacts_clean/**`) are present. If your clone skipped LFS, run `git lfs pull` locally before pushing so the deploy includes the files.
 5. Start command comes from `Procfile`: `./scripts/serve_probe_analysis.sh`.
 

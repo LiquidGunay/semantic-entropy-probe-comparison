@@ -18,6 +18,36 @@ def _():
 
 
 @app.cell
+def _(mo, os):
+    # On some hosts (e.g., Railway), /dev/shm is very small. marimo's "virtual file"
+    # mechanism uses multiprocessing.shared_memory, which is backed by /dev/shm and
+    # can crash the process with SIGBUS when it fills up.
+    #
+    # Setting MARIMO_NO_SHM=1 forces virtual files to be inlined as data URLs
+    # instead of stored in shared memory.
+    if os.getenv("MARIMO_NO_SHM", "0") == "1":
+        import marimo._runtime.virtual_file as vf
+
+        def _create_data_url(self, context):  # noqa: ARG001
+            filename = vf.random_filename(self.ext)
+            self._virtual_file = vf.VirtualFile(
+                filename=filename,
+                buffer=self.buffer,
+                as_data_url=True,
+            )
+
+        if getattr(vf.VirtualFileLifecycleItem.create, "__marimo_no_shm_patch__", False) is False:
+            _create_data_url.__marimo_no_shm_patch__ = True  # type: ignore[attr-defined]
+            vf.VirtualFileLifecycleItem.create = _create_data_url  # type: ignore[method-assign]
+
+        view = mo.md("`MARIMO_NO_SHM=1`: virtual files inlined (no `/dev/shm`).")
+    else:
+        view = None
+    view
+    return
+
+
+@app.cell
 def _(mo):
     mo.md("""
     # Probe Analysis (Altair + marimo)

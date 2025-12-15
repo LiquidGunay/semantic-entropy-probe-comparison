@@ -12,6 +12,7 @@ fi
 
 MARIMO_MODE="${MARIMO_MODE:-run}"
 MARIMO_NOTEBOOK="${MARIMO_NOTEBOOK:-notebooks/probe_analysis.py}"
+export MARIMO_NO_SHM="${MARIMO_NO_SHM:-1}"
 
 PORT="${PORT:-6780}"
 ALLOW_ORIGINS="${ALLOW_ORIGINS:-*}"
