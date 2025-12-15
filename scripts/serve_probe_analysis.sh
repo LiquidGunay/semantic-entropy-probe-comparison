@@ -13,50 +13,23 @@ fi
 MARIMO_MODE="${MARIMO_MODE:-run}"
 MARIMO_NOTEBOOK="${MARIMO_NOTEBOOK:-notebooks/probe_analysis.py}"
 export MARIMO_NO_SHM="${MARIMO_NO_SHM:-1}"
+export JOBLIB_MULTIPROCESSING="${JOBLIB_MULTIPROCESSING:-0}"
+export LOKY_MAX_CPU_COUNT="${LOKY_MAX_CPU_COUNT:-1}"
+export NUMBA_NUM_THREADS="${NUMBA_NUM_THREADS:-1}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 
 PORT="${PORT:-6780}"
 ALLOW_ORIGINS="${ALLOW_ORIGINS:-*}"
 ANALYSIS_PARQUET="${ANALYSIS_PARQUET:-artifacts_clean/analysis/analysis.parquet}"
 METRICS_JSON="${METRICS_JSON:-artifacts_clean/models/probe_eval.json}"
-# Use an app-local tmpdir to avoid small /tmp or shm limits on hosts like Railway.
-DEFAULT_DATA_ROOT="/data"
-if [ -n "${DATA_ROOT:-}" ]; then
-  : # user-provided
-elif [ -d "${DEFAULT_DATA_ROOT}" ] && [ -w "${DEFAULT_DATA_ROOT}" ]; then
-  DATA_ROOT="${DEFAULT_DATA_ROOT}"
-else
-  DATA_ROOT="/tmp/sep-marimo"
-fi
-
-SRC_ROOT="/app"
-if [ ! -d "${SRC_ROOT}" ]; then
-  SRC_ROOT="$(pwd)"
-fi
-
-APP_ROOT="${APP_ROOT:-${DATA_ROOT}/app}"
-APP_TMP="${APP_TMP:-${DATA_ROOT}/tmp}"
-APP_CACHE="${APP_CACHE:-${DATA_ROOT}/uv-cache}"
-APP_SHM="${APP_SHM:-${DATA_ROOT}/shm}"
-
-if [ -d "${DATA_ROOT}" ] && [ -w "${DATA_ROOT}" ] && [ "${STAGE_APP_TO_DATA:-1}" = "1" ]; then
-  mkdir -p "${APP_ROOT}" "${APP_CACHE}" "${APP_SHM}"
-  echo "Syncing app files into ${APP_ROOT}..."
-  rm -rf "${APP_ROOT}/notebooks" "${APP_ROOT}/scripts" "${APP_ROOT}/sep_marimo" "${APP_ROOT}/artifacts_clean"
-  cp -a "${SRC_ROOT}/notebooks" "${APP_ROOT}/"
-  cp -a "${SRC_ROOT}/scripts" "${APP_ROOT}/"
-  cp -a "${SRC_ROOT}/sep_marimo" "${APP_ROOT}/"
-  cp -a "${SRC_ROOT}/artifacts_clean" "${APP_ROOT}/"
-  cp -a "${SRC_ROOT}/pyproject.toml" "${SRC_ROOT}/uv.lock" "${APP_ROOT}/" 2>/dev/null || true
-  cp -a "${SRC_ROOT}/.python-version" "${APP_ROOT}/" 2>/dev/null || true
-  cd "${APP_ROOT}"
-fi
-
+# Keep all temp/caches out of /dev/shm and within a writable directory.
+APP_TMP="${APP_TMP:-/tmp/sep-marimo}"
 mkdir -p "${APP_TMP}"
 export TMPDIR="${TMPDIR:-${APP_TMP}}"
 export MARIMO_TMPDIR="${MARIMO_TMPDIR:-${APP_TMP}}"
 export ARROW_TMPDIR="${ARROW_TMPDIR:-${APP_TMP}}"
 export JOBLIB_TEMP_FOLDER="${JOBLIB_TEMP_FOLDER:-${APP_TMP}}"
-export UV_CACHE_DIR="${UV_CACHE_DIR:-${APP_CACHE}}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-${APP_TMP}/uv-cache}"
 export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
 
 # If we can bind-mount a fake shm into a writable path, point Python there.
