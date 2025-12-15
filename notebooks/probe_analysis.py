@@ -137,11 +137,11 @@ def _(alt, df_filt, mo, pd, selection_widget):
     else:
         # Keep plot data small: df_filt includes long text columns (question/think/output),
         # which can blow up marimo's Arrow payload and /dev/shm usage on constrained hosts.
-        plot_cols = ["run_uid", "question_id", "probe_margin", "mean_think_entropy", "is_correct"]
-        df_plot = df_filt[plot_cols].copy()
+        _plot_cols = ["run_uid", "question_id", "probe_margin", "mean_think_entropy", "is_correct"]
+        _df_plot = df_filt[_plot_cols]
         zero_rule = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#555", strokeDash=[6, 4]).encode(x="x:Q")
         margin_scatter = (
-            alt.Chart(df_plot)
+            alt.Chart(_df_plot)
             .mark_circle()
             .encode(
                 x=alt.X("probe_margin:Q", title="Probe margin"),
@@ -171,10 +171,10 @@ def _(alt, df_filt, mo, sel_ids):
             ("entropy_baseline_margin", "Entropy baseline margin"),
         ]
         for col, title in specs:
-            plot_cols = ["run_uid", "question_id", "umap_x", "umap_y", "is_correct", col]
-            df_plot = df_filt[plot_cols].copy()
+            _plot_cols = ["run_uid", "question_id", "umap_x", "umap_y", "is_correct", col]
+            _df_plot = df_filt[_plot_cols]
             chart_spec = (
-                alt.Chart(df_plot)
+                alt.Chart(_df_plot)
                 .mark_circle()
                 .encode(
                     x=alt.X("umap_x:Q", title="UMAP-1"),
@@ -199,10 +199,10 @@ def _(alt, df_filt, mo):
         se_scatter_widget = None
         view_se = mo.alert("No data to plot SE vs margin")
     else:
-        plot_cols = ["run_uid", "question_id", "semantic_entropy", "se_probe_margin", "is_correct"]
-        df_plot = df_filt[plot_cols].copy()
+        _plot_cols = ["run_uid", "question_id", "semantic_entropy", "se_probe_margin", "is_correct"]
+        _df_plot = df_filt[_plot_cols]
         se_scatter = (
-            alt.Chart(df_plot)
+            alt.Chart(_df_plot)
             .mark_circle()
             .encode(
                 x=alt.X("semantic_entropy:Q", title="Semantic entropy"),
