@@ -19,6 +19,28 @@ export NUMBA_NUM_THREADS="${NUMBA_NUM_THREADS:-1}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 
 PORT="${PORT:-6780}"
+if [ -n "${MARIMO_HOST:-}" ]; then
+  : # user-provided
+else
+  # Prefer IPv6 when available; fall back to IPv4 if IPv6 sockets are blocked.
+  if python - <<'PY'
+import socket
+import sys
+
+try:
+    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    s.bind(("::", 0))
+except Exception:
+    sys.exit(1)
+else:
+    sys.exit(0)
+PY
+  then
+    MARIMO_HOST="::"
+  else
+    MARIMO_HOST="0.0.0.0"
+  fi
+fi
 ALLOW_ORIGINS="${ALLOW_ORIGINS:-*}"
 ANALYSIS_PARQUET="${ANALYSIS_PARQUET:-artifacts_clean/analysis/analysis.parquet}"
 METRICS_JSON="${METRICS_JSON:-artifacts_clean/models/probe_eval.json}"
@@ -44,9 +66,9 @@ export XDG_DATA_HOME="${XDG_DATA_HOME:-${APP_TMP}/xdg-data}"
 [ -f "$ANALYSIS_PARQUET" ] || echo "Warning: analysis parquet missing at $ANALYSIS_PARQUET"
 [ -f "$METRICS_JSON" ] || echo "Warning: metrics JSON missing at $METRICS_JSON"
 
-echo "Starting marimo (${MARIMO_MODE}) on port ${PORT} (origins=${ALLOW_ORIGINS})"
+echo "Starting marimo (${MARIMO_MODE}) on ${MARIMO_HOST}:${PORT} (origins=${ALLOW_ORIGINS})"
 exec marimo "${MARIMO_MODE}" "${MARIMO_NOTEBOOK}" \
-  --host 0.0.0.0 \
+  --host "${MARIMO_HOST}" \
   --port "${PORT}" \
   --no-token \
   --allow-origins="${ALLOW_ORIGINS}" \
