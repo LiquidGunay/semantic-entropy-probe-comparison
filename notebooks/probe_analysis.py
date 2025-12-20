@@ -29,8 +29,13 @@ def _(mo, os):
         import marimo._runtime.virtual_file as vf
 
         def _create_data_url(self, context):  # noqa: ARG001
-            filename = vf.random_filename(self.ext)
-            self._virtual_file = vf.VirtualFile(
+            # Import inside the patched method: marimo may execute this function
+            # in a different module context than the patch cell, so relying on
+            # a closed-over `vf` can fail.
+            import marimo._runtime.virtual_file as _vf
+
+            filename = _vf.random_filename(self.ext)
+            self._virtual_file = _vf.VirtualFile(
                 filename=filename,
                 buffer=self.buffer,
                 as_data_url=True,
