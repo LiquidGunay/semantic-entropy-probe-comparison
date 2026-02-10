@@ -23,6 +23,24 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--artifacts-dir", type=Path, default=None, help="Artifacts directory (hidden states, probe datasets)")
     p.add_argument("--models-dir", type=Path, default=None, help="Directory containing trained probes")
     p.add_argument("--out", type=Path, default=None, help="Output parquet path (default: artifacts/analysis/analysis.parquet)")
+    p.add_argument(
+        "--out-chart",
+        type=Path,
+        default=None,
+        help="Output parquet path (default: artifacts/analysis/analysis_chart.parquet)",
+    )
+    p.add_argument(
+        "--out-detail",
+        type=Path,
+        default=None,
+        help="Output parquet path (default: artifacts/analysis/analysis_detail.parquet)",
+    )
+    p.add_argument(
+        "--public-dir",
+        type=Path,
+        default=Path("notebooks/public"),
+        help="Optional directory for CSV exports used by WASM notebooks",
+    )
     p.add_argument("--math-runs", type=Path, default=None, help="Optional override for math runs JSONL (cleaned)")
     p.add_argument("--math-sem", type=Path, default=None, help="Optional override for math semantic entropy JSONL (cleaned)")
     p.add_argument("--ood-runs", type=Path, default=None, help="Optional override for ood runs JSONL")
@@ -159,6 +177,9 @@ def _process_split(
 
     rows: List[Dict] = []
     kept_feats: List[np.ndarray] = []
+    y_size = int(y.shape[0]) if hasattr(y, "shape") else len(y)
+    ent_size = int(ent.shape[0]) if hasattr(ent, "shape") else len(ent)
+    se_size = int(se_arr.shape[0]) if (se_arr is not None and hasattr(se_arr, "shape")) else 0
     for i in range(X.shape[0]):
         qid = str(qids[i])
         rid = int(rids[i])
@@ -167,14 +188,17 @@ def _process_split(
             continue
         kept_feats.append(X[i])
         qinfo = qmap.get(qid, {})
-        se_val = _maybe_nan(se_arr[i]) if se_arr is not None else _maybe_nan(rec.get("semantic_entropy"))
+        se_val = _maybe_nan(se_arr[i]) if (se_arr is not None and i < se_size) else _maybe_nan(rec.get("semantic_entropy"))
+        is_correct = bool(y[i]) if i < y_size else bool(rec.get("is_correct", False))
+        think_entropy = float(ent[i]) if i < ent_size else _maybe_nan(rec.get("mean_think_entropy"))
         row = {
             "run_uid": f"{dataset_label}-{qid}-{rid}",
             "dataset": dataset_label,
             "split": name,
             "question_id": qid,
             "run_id": rid,
-            "is_correct": bool(y[i]),
+            "problem_type": qinfo.get("problem_type", ""),
+            "is_correct": is_correct,
             "probe_prob_correct": float(prob_acc[i]),
             "probe_margin": float(margin_acc[i]),
             "probe_norm_margin": float(norm_margin_acc[i]),
@@ -184,7 +208,7 @@ def _process_split(
             "se_probe_norm_margin": float(norm_margin_se[i]),
             "entropy_baseline_prob": float(prob_ent[i]),
             "entropy_baseline_margin": float(margin_ent[i]),
-            "mean_think_entropy": float(ent[i]),
+            "mean_think_entropy": think_entropy,
             "semantic_entropy": se_val,
             "tau_answer": float(tau_answer),
             "question": qinfo.get("question", ""),
@@ -218,7 +242,11 @@ def main() -> int:
     artifacts_dir = args.artifacts_dir or cfg.artifacts_dir
     models_dir = args.models_dir or cfg.models_dir
     out_path = args.out or (artifacts_dir / "analysis" / "analysis.parquet")
+    out_chart_path = args.out_chart or (artifacts_dir / "analysis" / "analysis_chart.parquet")
+    out_detail_path = args.out_detail or (artifacts_dir / "analysis" / "analysis_detail.parquet")
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_chart_path.parent.mkdir(parents=True, exist_ok=True)
+    out_detail_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Load probes and threshold
     acc_probe = joblib.load(models_dir / "accuracy_probe.pkl")
@@ -296,7 +324,61 @@ def main() -> int:
 
     df = pd.DataFrame(rows)
     df.to_parquet(out_path, index=False)
+
+    chart_cols = [
+        "run_uid",
+        "dataset",
+        "split",
+        "question_id",
+        "run_id",
+        "problem_type",
+        "is_correct",
+        "probe_prob_correct",
+        "probe_margin",
+        "probe_norm_margin",
+        "probe_projection",
+        "se_probe_prob_high",
+        "se_probe_margin",
+        "se_probe_norm_margin",
+        "entropy_baseline_prob",
+        "entropy_baseline_margin",
+        "mean_think_entropy",
+        "semantic_entropy",
+        "tau_answer",
+        "think_token_len",
+        "think_char_len",
+        "umap_x",
+        "umap_y",
+        "is_representative",
+    ]
+    detail_cols = [
+        "run_uid",
+        "dataset",
+        "split",
+        "question_id",
+        "run_id",
+        "problem_type",
+        "is_correct",
+        "question",
+        "gold_answer",
+        "think_text",
+        "answer_text",
+        "output_text",
+    ]
+    chart_df = df[[col for col in chart_cols if col in df.columns]].copy()
+    detail_df = df[[col for col in detail_cols if col in df.columns]].copy()
+    chart_df.to_parquet(out_chart_path, index=False)
+    detail_df.to_parquet(out_detail_path, index=False)
+
+    if args.public_dir is not None:
+        args.public_dir.mkdir(parents=True, exist_ok=True)
+        chart_df.to_csv(args.public_dir / "analysis.csv", index=False)
+        chart_df.to_csv(args.public_dir / "analysis_chart.csv", index=False)
+        detail_df.to_csv(args.public_dir / "analysis_detail.csv", index=False)
+
     print(f"Wrote {len(df)} rows to {out_path}")
+    print(f"Wrote chart dataset ({len(chart_df)} rows) to {out_chart_path}")
+    print(f"Wrote detail dataset ({len(detail_df)} rows) to {out_detail_path}")
     return 0
 
 

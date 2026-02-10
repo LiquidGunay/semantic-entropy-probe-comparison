@@ -1,3 +1,49 @@
+# ExecPlan Update (2026-02-10): Notebook Optimization + Vega/VegaFusion Feasibility
+
+This plan now serves as the sibling sub-plan for the personal-site redesign roadmap.
+
+## Scope
+
+- Split analysis outputs into chart and detail datasets.
+- Update marimo notebooks to load reduced chart payloads and join heavy detail rows only for selected runs.
+- Add deterministic sampling and point caps in UI filtering paths.
+- Add benchmark script for load/filter/chart-spec latency and memory tracking.
+- Keep VegaFusion as a capability check in server mode; use dataframe reduction as the default robust path for both server and WASM.
+
+## Progress
+
+- [x] Added chart/detail output support in `scripts/07_build_analysis_dataset.py`.
+- [x] Rewrote `notebooks/probe_analysis.py` to use split dataset paths and bounded detail rendering.
+- [x] Rewrote `notebooks/probe_analysis_wasm.py` to use `public/analysis_chart.csv` and `public/analysis_detail.csv` with fallback behavior.
+- [x] Added `scripts/08_benchmark_analysis_io.py` for repeatable performance snapshots.
+- [ ] Run end-to-end benchmark before/after and record values here.
+- [ ] Validate WASM export with updated datasets and document runtime evidence.
+
+## Decision Log
+
+- Decision: Preserve compatibility by continuing to emit `analysis.parquet` and `analysis.csv` while adding split datasets.
+  Rationale: Existing consumers keep working during migration.
+  Date/Author: 2026-02-10 / Codex.
+
+- Decision: Prioritize upstream dataframe reduction over browser-side transform complexity.
+  Rationale: Works consistently across marimo server and WASM exports.
+  Date/Author: 2026-02-10 / Codex.
+
+- Decision: Treat VegaFusion as optional enhancement via explicit runtime toggle.
+  Rationale: Avoid hard dependency in environments where transformer integration may vary.
+  Date/Author: 2026-02-10 / Codex.
+
+## Benchmark Commands
+
+From `/home/ubuntu/semantic-entropy-probe-comparison`:
+
+    python scripts/07_build_analysis_dataset.py
+    python scripts/08_benchmark_analysis_io.py --out artifacts/analysis/benchmark.json
+    uv run marimo run notebooks/probe_analysis.py --host 127.0.0.1 --port 7860
+    marimo export html-wasm notebooks/probe_analysis_wasm.py -o artifacts/wasm-test --mode run
+
+---
+
 # Semantic Entropy Probes – Handoff Plan (analysis notebook, LFS, deps)
 Date: 2025-12-04
 Working dir: `/.gunayexp/semantic-entropy-probe-comparison`

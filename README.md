@@ -43,9 +43,10 @@ Notes
 - `scripts/04_build_probe_datasets.py`: join runs + hidden + labels into NPZ splits.
 - `scripts/05_train_probes.py`: train accuracy, SE (high semantic entropy), and entropy baseline probes.
 - `scripts/06_eval_probes.py`: AUROC/AUPRC + permutation p-values, confidence summary.
-- `scripts/07_build_analysis_dataset.py`: compact per-run parquet with probe scores, entropies, UMAP coords for the notebook.
+- `scripts/07_build_analysis_dataset.py`: compact per-run dataset builder; writes full + split chart/detail outputs.
+- `scripts/08_benchmark_analysis_io.py`: benchmark load/filter/chart-spec latency and memory for analysis datasets.
 - `notebooks/probe_analysis.py`: Altair + marimo dashboard (filters, margin/entropy scatter, fixed UMAP, capped selection details).
-- `artifacts/`: hidden states, probe datasets, models, eval JSON, analysis parquet (LFS).
+- `artifacts/`: hidden states, probe datasets, models, eval JSON, analysis datasets (LFS).
 - `data/`: math_raw/runs/semantic entropy (LFS); add `ood_raw.jsonl` if needed.
 
 ## Qwen uncertainty pipeline (MATH-500 style)
@@ -94,7 +95,8 @@ Outputs land in `data/` (runs, semantic entropy) and `artifacts/` (hidden states
 
 8) **Build compact analysis dataset + notebook**
 ```bash
-python scripts/07_build_analysis_dataset.py  # reads artifacts, writes artifacts/analysis/analysis.parquet
+python scripts/07_build_analysis_dataset.py  # writes analysis.parquet + analysis_chart.parquet + analysis_detail.parquet
+python scripts/08_benchmark_analysis_io.py --out artifacts/analysis/benchmark.json
 PORT=7860 ./scripts/serve_probe_analysis.sh
 ```
 

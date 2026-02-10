@@ -6,32 +6,25 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
-    import marimo as mo
-    import altair as alt
-    import numpy as np
-    import pandas as pd
     import json
     import os
     from pathlib import Path
+
+    import altair as alt
+    import marimo as mo
+    import pandas as pd
     from sklearn.metrics import roc_curve
+
     return Path, alt, json, mo, os, pd, roc_curve
 
 
 @app.cell
 def _(mo, os):
-    # On some hosts (e.g., Railway), /dev/shm is very small. marimo's "virtual file"
-    # mechanism uses multiprocessing.shared_memory, which is backed by /dev/shm and
-    # can crash the process with SIGBUS when it fills up.
-    #
-    # Setting MARIMO_NO_SHM=1 forces virtual files to be inlined as data URLs
-    # instead of stored in shared memory.
+    # Keep marimo virtual files out of /dev/shm on constrained hosts.
     if os.getenv("MARIMO_NO_SHM", "0") == "1":
         import marimo._runtime.virtual_file as vf
 
         def _create_data_url(self, context):  # noqa: ARG001
-            # Import inside the patched method: marimo may execute this function
-            # in a different module context than the patch cell, so relying on
-            # a closed-over `vf` can fail.
             import marimo._runtime.virtual_file as _vf
 
             filename = _vf.random_filename(self.ext)
@@ -45,88 +38,135 @@ def _(mo, os):
             _create_data_url.__marimo_no_shm_patch__ = True  # type: ignore[attr-defined]
             vf.VirtualFileLifecycleItem.create = _create_data_url  # type: ignore[method-assign]
 
-        view = mo.md("`MARIMO_NO_SHM=1`: virtual files inlined (no `/dev/shm`).")
+        shm_notice = mo.md("`MARIMO_NO_SHM=1`: virtual files inlined as data URLs.")
     else:
-        view = None
-    view
+        shm_notice = None
+    shm_notice
+    return
+
+
+@app.cell
+def _(alt, mo, os):
+    status = "VegaFusion transformer disabled (set USE_VEGAFUSION=1 to test)."
+    if os.getenv("USE_VEGAFUSION", "0") == "1":
+        try:
+            alt.data_transformers.enable("vegafusion")
+            status = "VegaFusion transformer enabled for Altair."
+        except Exception as exc:  # noqa: BLE001
+            status = f"VegaFusion unavailable: {exc}"
+    mo.callout(status, kind="warn")
     return
 
 
 @app.cell
 def _(mo):
-    mo.md("""
+    mo.md(
+        """
     # Probe Analysis (Altair + marimo)
-    Visualize probe scores, entropies, and UMAP embeddings. Use the controls to filter; charts support interval selection.
-    """)
+    Fast exploration view for probe margins, entropy signals, and UMAP structure.
+
+    This notebook expects a **split dataset**:
+    - chart dataset: light-weight numeric columns for plotting
+    - detail dataset: heavy text columns for selected-run inspection
+    """
+    )
     return
 
 
 @app.cell
 def _(Path, json, mo, os, pd):
-    data_path = Path(os.getenv("ANALYSIS_PARQUET", "artifacts_clean/analysis/analysis.parquet"))
+    chart_path = Path(os.getenv("ANALYSIS_CHART_PARQUET", "artifacts_clean/analysis/analysis_chart.parquet"))
+    fallback_path = Path(os.getenv("ANALYSIS_PARQUET", "artifacts_clean/analysis/analysis.parquet"))
+    detail_path = Path(os.getenv("ANALYSIS_DETAIL_PARQUET", "artifacts_clean/analysis/analysis_detail.parquet"))
     metrics_path = Path(os.getenv("METRICS_JSON", "artifacts_clean/models/probe_eval.json"))
-    if data_path.exists():
-        df_all = pd.read_parquet(data_path)
-        data_notice = mo.md(f"Loaded analysis dataset: `{data_path}`")
-    else:
-        df_all = pd.DataFrame()
-        data_notice = mo.alert(f"Analysis dataset not found: {data_path}. Set ANALYSIS_PARQUET or include the parquet in the image.")
 
-    controls = dict(
-        dataset_filter=mo.ui.dropdown(options=["all", "math", "ood"], value="all", label="Dataset"),
-        rep_only=mo.ui.switch(value=False, label="Per-question representative only"),
-        correctness_filter=mo.ui.dropdown(options=["all", "correct", "incorrect"], value="all", label="Correctness"),
-        max_points=mo.ui.slider(200, 10000, value=5000, step=200, label="Max points to plot"),
-        seed_box=mo.ui.number(start=0, stop=10_000, step=1, value=42, label="Random seed"),
-        metrics_path=metrics_path,
-    )
-    mo.vstack([
-        data_notice,
-        mo.hstack(
-            [
-                controls["dataset_filter"],
-                controls["rep_only"],
-                controls["correctness_filter"],
-                controls["max_points"],
-                controls["seed_box"],
-            ]
+    if chart_path.exists():
+        chart_df = pd.read_parquet(chart_path)
+        chart_notice = mo.md(f"Loaded chart dataset: `{chart_path}`")
+    elif fallback_path.exists():
+        chart_df = pd.read_parquet(fallback_path)
+        chart_notice = mo.callout(
+            f"Chart parquet not found. Using fallback full dataset: `{fallback_path}`",
+            kind="warn",
         )
-    ])
-    return controls, df_all, metrics_path
+    else:
+        chart_df = pd.DataFrame()
+        chart_notice = mo.alert(f"No chart dataset found. Checked: `{chart_path}` and `{fallback_path}`")
+
+    if detail_path.exists():
+        detail_df = pd.read_parquet(detail_path)
+        detail_notice = mo.md(f"Loaded detail dataset: `{detail_path}`")
+    else:
+        detail_df = pd.DataFrame()
+        detail_notice = mo.callout(
+            "Detail dataset not found; selected-run inspection will be limited.",
+            kind="warn",
+        )
+
+    metrics = None
+    if metrics_path.exists():
+        with metrics_path.open("r", encoding="utf-8") as f:
+            metrics = json.load(f)
+
+    controls = {
+        "dataset_filter": mo.ui.dropdown(options=["all", "math", "ood"], value="all", label="Dataset"),
+        "rep_only": mo.ui.switch(value=False, label="Representatives only"),
+        "correctness_filter": mo.ui.dropdown(
+            options=["all", "correct", "incorrect"], value="all", label="Correctness"
+        ),
+        "max_points": mo.ui.slider(200, 10000, value=5000, step=200, label="Max plotted points"),
+        "seed_box": mo.ui.number(start=0, stop=10000, step=1, value=42, label="Sampling seed"),
+    }
+
+    mo.vstack(
+        [
+            chart_notice,
+            detail_notice,
+            mo.hstack(
+                [
+                    controls["dataset_filter"],
+                    controls["rep_only"],
+                    controls["correctness_filter"],
+                    controls["max_points"],
+                    controls["seed_box"],
+                ]
+            ),
+        ]
+    )
+    return chart_df, controls, detail_df, metrics
 
 
 @app.cell
-def _(df_all, mo):
-    mo.ui.dataframe(df_all)
-    return
-
-
-@app.cell
-def _(controls, df_all, mo):
-    df_filt = df_all.copy()
+def _(chart_df, controls, mo):
+    df_filt = chart_df.copy()
     if controls["dataset_filter"].value != "all":
         df_filt = df_filt[df_filt["dataset"] == controls["dataset_filter"].value]
     if controls["rep_only"].value:
-        df_filt = df_filt[df_filt.get("is_representative", False)]
+        if "is_representative" in df_filt.columns:
+            df_filt = df_filt[df_filt["is_representative"]]
     if controls["correctness_filter"].value == "correct":
         df_filt = df_filt[df_filt["is_correct"]]
     elif controls["correctness_filter"].value == "incorrect":
         df_filt = df_filt[~df_filt["is_correct"]]
 
     if len(df_filt) > controls["max_points"].value:
-        df_filt = df_filt.sample(n=int(controls["max_points"].value), random_state=int(controls["seed_box"].value))
+        df_filt = df_filt.sample(
+            n=int(controls["max_points"].value),
+            random_state=int(controls["seed_box"].value),
+        )
 
     df_filt = df_filt.reset_index(drop=True)
     selection_widget = mo.ui.multiselect(
-        options=df_filt["run_uid"].tolist()[:5000],
-        value=df_filt["run_uid"].tolist()[: min(3, len(df_filt))],
+        options=df_filt.get("run_uid", []).tolist()[:5000],
+        value=df_filt.get("run_uid", []).tolist()[: min(3, len(df_filt))],
         label="Selected runs (<=10)",
     )
+
     mo.hstack(
         [
             selection_widget,
             mo.md(
-                f"{len(df_filt)} rows | correct={df_filt['is_correct'].sum()} / incorrect={len(df_filt)-df_filt['is_correct'].sum()}"
+                f"{len(df_filt)} rows | correct={int(df_filt.get('is_correct', []).sum()) if not df_filt.empty else 0}"
             ),
         ]
     )
@@ -134,133 +174,137 @@ def _(controls, df_all, mo):
 
 
 @app.cell
-def _(alt, df_filt, mo, pd, selection_widget):
-    sel_ids = selection_widget.value[:10]
+def _(alt, df_filt, mo, selection_widget):
+    margin_sel_ids = list(selection_widget.value)[:10]
     if df_filt.empty:
         margin_chart = None
-        view_margin = mo.alert("No rows to plot")
+        margin_view = mo.alert("No rows to plot")
     else:
-        # Keep plot data small: df_filt includes long text columns (question/think/output),
-        # which can blow up marimo's Arrow payload and /dev/shm usage on constrained hosts.
-        _plot_cols = ["run_uid", "question_id", "probe_margin", "mean_think_entropy", "is_correct"]
-        _df_plot = df_filt[_plot_cols]
-        zero_rule = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#555", strokeDash=[6, 4]).encode(x="x:Q")
-        margin_scatter = (
-            alt.Chart(_df_plot)
-            .mark_circle()
+        cols = ["run_uid", "question_id", "probe_margin", "mean_think_entropy", "is_correct"]
+        margin_plot_df = df_filt[[c for c in cols if c in df_filt.columns]].dropna(
+            subset=[c for c in ["probe_margin", "mean_think_entropy"] if c in df_filt.columns]
+        )
+        margin_chart_spec = (
+            alt.Chart(margin_plot_df)
+            .mark_circle(size=56, opacity=0.72)
             .encode(
                 x=alt.X("probe_margin:Q", title="Probe margin"),
                 y=alt.Y("mean_think_entropy:Q", title="Mean think entropy"),
-                color=alt.Color("is_correct:N", scale=alt.Scale(domain=[True, False], range=["#1b9e77", "#d95f02"])),
+                color=alt.Color("is_correct:N", title="Correct"),
                 tooltip=["run_uid", "question_id", "probe_margin", "mean_think_entropy", "is_correct"],
-                opacity=alt.condition(alt.FieldOneOfPredicate(field="run_uid", oneOf=sel_ids), alt.value(0.95), alt.value(0.5)),
-                size=alt.condition(alt.FieldOneOfPredicate(field="run_uid", oneOf=sel_ids), alt.value(120), alt.value(40)),
+                opacity=alt.condition(
+                    alt.FieldOneOfPredicate(field="run_uid", oneOf=margin_sel_ids),
+                    alt.value(0.95),
+                    alt.value(0.4),
+                ),
             )
-            .properties(height=280, width="container")
+            .properties(height=290, width="container")
         )
-        margin_chart = mo.ui.altair_chart(margin_scatter + zero_rule, chart_selection="interval")
-        view_margin = mo.vstack([mo.md("### Margin vs entropy (probe)"), margin_chart])
-    view_margin
-    return margin_chart, sel_ids
+        margin_chart = mo.ui.altair_chart(margin_chart_spec, chart_selection="interval")
+        margin_view = mo.vstack([mo.md("### Margin vs entropy"), margin_chart])
+    margin_view
+    return margin_chart
 
 
 @app.cell
-def _(alt, df_filt, mo, sel_ids):
-    umap_widgets = []
-    if df_filt.empty:
-        view_umap = mo.alert("No UMAP coordinates to plot")
+def _(alt, df_filt, mo, selection_widget):
+    umap_sel_ids = list(selection_widget.value)[:10]
+    if df_filt.empty or not {"umap_x", "umap_y"}.issubset(df_filt.columns):
+        umap_view = mo.alert("No UMAP data available")
     else:
-        specs = [
+        umap_blocks = []
+        for col, title in [
             ("probe_margin", "Probe margin"),
             ("se_probe_margin", "SE probe margin"),
             ("entropy_baseline_margin", "Entropy baseline margin"),
-        ]
-        for col, title in specs:
-            _plot_cols = ["run_uid", "question_id", "umap_x", "umap_y", "is_correct", col]
-            _df_plot = df_filt[_plot_cols]
-            chart_spec = (
-                alt.Chart(_df_plot)
-                .mark_circle()
+        ]:
+            if col not in df_filt.columns:
+                continue
+            umap_plot_df = df_filt[["run_uid", "question_id", "umap_x", "umap_y", "is_correct", col]].copy()
+            umap_chart = (
+                alt.Chart(umap_plot_df)
+                .mark_circle(size=45, opacity=0.78)
                 .encode(
                     x=alt.X("umap_x:Q", title="UMAP-1"),
                     y=alt.Y("umap_y:Q", title="UMAP-2"),
-                    color=alt.Color(col + ":Q", title=title),
+                    color=alt.Color(f"{col}:Q", title=title),
                     tooltip=["run_uid", "question_id", col, "is_correct"],
-                    opacity=alt.condition(alt.FieldOneOfPredicate(field="run_uid", oneOf=sel_ids), alt.value(0.95), alt.value(0.5)),
-                    size=alt.condition(alt.FieldOneOfPredicate(field="run_uid", oneOf=sel_ids), alt.value(120), alt.value(40)),
+                    opacity=alt.condition(
+                        alt.FieldOneOfPredicate(field="run_uid", oneOf=umap_sel_ids),
+                        alt.value(0.95),
+                        alt.value(0.35),
+                    ),
                 )
                 .properties(height=300, width=300)
             )
-            widget = mo.ui.altair_chart(chart_spec, chart_selection="interval")
-            umap_widgets.append(mo.vstack([mo.md(f"### UMAP colored by {title}"), widget]))
-        view_umap = mo.hstack(umap_widgets)
-    view_umap
-    return (umap_widgets,)
+            umap_blocks.append(
+                mo.vstack([mo.md(f"### {title}"), mo.ui.altair_chart(umap_chart, chart_selection="interval")])
+            )
+        umap_view = mo.hstack(umap_blocks) if umap_blocks else mo.alert("No UMAP margin columns available")
+    umap_view
+    return
 
 
 @app.cell
 def _(alt, df_filt, mo):
-    if df_filt.empty:
-        se_scatter_widget = None
-        view_se = mo.alert("No data to plot SE vs margin")
+    if df_filt.empty or not {"semantic_entropy", "se_probe_margin"}.issubset(df_filt.columns):
+        se_view = mo.alert("No SE data to plot")
     else:
-        _plot_cols = ["run_uid", "question_id", "semantic_entropy", "se_probe_margin", "is_correct"]
-        _df_plot = df_filt[_plot_cols]
-        se_scatter = (
-            alt.Chart(_df_plot)
-            .mark_circle()
+        se_plot_df = df_filt[["run_uid", "question_id", "semantic_entropy", "se_probe_margin", "is_correct"]].dropna()
+        se_chart = (
+            alt.Chart(se_plot_df)
+            .mark_circle(size=48, opacity=0.74)
             .encode(
                 x=alt.X("semantic_entropy:Q", title="Semantic entropy"),
                 y=alt.Y("se_probe_margin:Q", title="SE probe margin"),
-                color="is_correct:N",
+                color=alt.Color("is_correct:N", title="Correct"),
                 tooltip=["run_uid", "question_id", "semantic_entropy", "se_probe_margin", "is_correct"],
             )
-            .properties(height=280, width="container")
+            .properties(height=290, width="container")
         )
-        se_scatter_widget = mo.ui.altair_chart(se_scatter, chart_selection="interval")
-        view_se = mo.vstack([mo.md("### SE vs SE-probe margin"), se_scatter_widget])
-    view_se
-    return (se_scatter_widget,)
+        se_view = mo.vstack([mo.md("### Semantic entropy vs SE-probe margin"), mo.ui.altair_chart(se_chart)])
+    se_view
+    return
 
 
 @app.cell
 def _(alt, df_filt, mo, pd, roc_curve):
     if df_filt.empty:
-        view_roc = mo.alert("No rows for AUC plot")
+        roc_view = mo.alert("No rows for ROC plot")
     else:
         labels = df_filt["is_correct"].astype(int)
         curves = []
-        for name, scores in {
-            "probe": df_filt["probe_prob_correct"],
-            "se_probe": df_filt["se_probe_prob_high"],
-            "entropy": df_filt["entropy_baseline_prob"],
-        }.items():
-            fpr, tpr, _ = roc_curve(labels, scores)
+        for name, series_name in [
+            ("probe", "probe_prob_correct"),
+            ("se_probe", "se_probe_prob_high"),
+            ("entropy", "entropy_baseline_prob"),
+        ]:
+            if series_name not in df_filt.columns:
+                continue
+            fpr, tpr, _ = roc_curve(labels, df_filt[series_name])
             curves.append(pd.DataFrame({"fpr": fpr, "tpr": tpr, "probe": name}))
-        roc_df = pd.concat(curves, ignore_index=True)
-        roc_chart = (
-            alt.Chart(roc_df)
-            .mark_line()
-            .encode(x="fpr:Q", y="tpr:Q", color="probe:N")
-            .properties(height=240, width="container")
-        )
-        view_roc = mo.vstack([mo.md("### ROC curves (current filter)"), mo.ui.altair_chart(roc_chart)])
-    view_roc
+        if not curves:
+            roc_view = mo.alert("No probability columns for ROC plot")
+        else:
+            roc_df = pd.concat(curves, ignore_index=True)
+            roc_chart = (
+                alt.Chart(roc_df)
+                .mark_line()
+                .encode(x="fpr:Q", y="tpr:Q", color="probe:N")
+                .properties(height=250, width="container")
+            )
+            roc_view = mo.vstack([mo.md("### ROC curves"), mo.ui.altair_chart(roc_chart)])
+    roc_view
     return
 
 
 @app.cell
-def _(
-    df_filt,
-    mo,
-    selection_widget,
-):
+def _(detail_df, df_filt, mo, selection_widget):
     selected_ids = list(selection_widget.value)[:10]
-
-    if df_filt.empty or not selected_ids:
-        view_table = mo.alert("No selections yet.")
+    if not selected_ids:
+        detail_view = mo.alert("No selected runs yet")
     else:
-        cols = [
+        score_cols = [
             "run_uid",
             "dataset",
             "problem_type",
@@ -273,32 +317,46 @@ def _(
             "think_token_len",
             "think_char_len",
         ]
-        missing = [c for c in cols if c not in df_filt.columns]
-        for c in missing:
-            df_filt[c] = "" if "type" in c else 0
-        table_df = df_filt[df_filt["run_uid"].isin(selected_ids)][cols].copy()
-        view_table = mo.ui.table(table_df)
-    view_table
+        score_df = df_filt[[c for c in score_cols if c in df_filt.columns]].copy()
+        score_df = score_df[score_df["run_uid"].isin(selected_ids)]
+
+        if detail_df.empty:
+            detail_view = mo.vstack(
+                [mo.callout("Detail dataset missing; showing score-only table.", kind="warn"), mo.ui.table(score_df)]
+            )
+        else:
+            detail_cols = [
+                "run_uid",
+                "question",
+                "gold_answer",
+                "answer_text",
+                "think_text",
+                "output_text",
+            ]
+            ddf = detail_df[[c for c in detail_cols if c in detail_df.columns]].copy()
+            ddf = ddf[ddf["run_uid"].isin(selected_ids)]
+            merged = score_df.merge(ddf, on="run_uid", how="left")
+            detail_view = mo.ui.table(merged)
+    detail_view
     return
 
 
 @app.cell
-def _(controls, json, mo):
-    metrics_path_val = controls["metrics_path"]
-    if not metrics_path_val.exists():
-        view_metrics = mo.alert(f"Metrics file not found: {metrics_path_val}")
+def _(metrics, mo):
+    if not metrics:
+        metrics_view = mo.callout("Metrics JSON missing or unreadable.", kind="warn")
     else:
-        with metrics_path_val.open("r", encoding="utf-8") as f:
-            metrics = json.load(f)
         cards = []
         for split, vals in metrics.items():
             cards.append(
                 mo.md(
-                    f"**{split}** | AUC acc={vals.get('auc_accuracy_probe','n/a')} | AUC se={vals.get('auc_se_probe','n/a')} | AUC ent={vals.get('auc_entropy_baseline','n/a')}"
+                    f"**{split}** | AUC acc={vals.get('auc_accuracy_probe', 'n/a')} | "
+                    f"AUC se={vals.get('auc_se_probe', 'n/a')} | "
+                    f"AUC ent={vals.get('auc_entropy_baseline', 'n/a')}"
                 )
             )
-        view_metrics = mo.vstack([mo.md("### Probe metrics"), mo.hstack(cards)])
-    view_metrics
+        metrics_view = mo.vstack([mo.md("### Probe metrics"), mo.hstack(cards)])
+    metrics_view
     return
 
 
